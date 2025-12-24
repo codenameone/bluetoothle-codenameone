@@ -18,5 +18,9 @@ jobs:
       with:
         java-version: '11'
         distribution: 'adopt'
+    - name: Setup Codename One Build Client
+      run: |
+        mkdir -p ~/.codenameone
+        wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
     - name: Build with Maven
       run: mvn install
