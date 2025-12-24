@@ -28,12 +28,6 @@
             <version>${cn1.version}</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>ca.weblite</groupId>
-            <artifactId>codename1-json</artifactId>
-            <version>1.0</version>
-            <scope>provided</scope>
-        </dependency>
     </dependencies>
 
     <build>

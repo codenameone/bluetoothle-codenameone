@@ -5,9 +5,9 @@
  */
 package com.codename1.cordova;
 
-import ca.weblite.codename1.json.JSONException;
 import com.codename1.system.NativeLookup;
 import java.io.IOException;
+import java.util.Map;
 
 /**
  *
@@ -29,10 +29,10 @@ public class Cordova {
         boolean executed = cordova.execute(action, jsonArgs);        
         if(executed){
             if(callback.isError()){
-                try {
-                    throw new IOException(callback.getResponse().getString("message"));
-                } catch (JSONException ex) {
-                    ex.printStackTrace();
+                Map response = callback.getResponse();
+                if (response != null && response.containsKey("message")) {
+                    throw new IOException((String)response.get("message"));
+                } else {
                     throw new IOException("Err");
                 }
             }

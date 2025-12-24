@@ -5,14 +5,14 @@
  */
 package com.codename1.cordova;
 
-import ca.weblite.codename1.json.JSONException;
-import ca.weblite.codename1.json.JSONObject;
 import com.codename1.io.Util;
-import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.JSONParserUtils;
+import java.io.IOException;
+import java.util.Map;
 
 /**
  *
@@ -20,7 +20,7 @@ import com.codename1.util.AsyncResource;
  */
 public class CordovaCallback {
     
-    private JSONObject response;
+    private Map response;
     private boolean complete;
     private Object completeLock = new Object();
     
@@ -33,30 +33,17 @@ public class CordovaCallback {
         this.listener = listener;
     }
     
-    public void onError(JSONObject json){
-        complete = true;
-        this.response = json;
-        synchronized(completeLock) {
-            completeLock.notifyAll();
+    public void onError(String jsonStr){
+        try {
+            onError(JSONParserUtils.parse(jsonStr));
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            // If parsing fails, maybe pass raw string wrapped?
+            // For now, print stack trace.
         }
     }
 
-    public void onSuccess(JSONObject json){
-        complete = true;
-        this.response = json;
-        if(listener != null){
-            Display.getInstance().callSerially(new Runnable(){
-                public void run(){
-                    listener.actionPerformed(new ActionEvent(json));
-                }
-            });
-        }
-        synchronized(completeLock) {
-            completeLock.notifyAll();
-        }
-    }
-
-    public void sendResult(JSONObject json){
+    public void onError(Map json){
         complete = true;
         this.response = json;
         if(listener != null){
@@ -71,14 +58,60 @@ public class CordovaCallback {
         }
     }
 
-    public JSONObject getResponse() {
+    public void onSuccess(String jsonStr) {
+        try {
+            onSuccess(JSONParserUtils.parse(jsonStr));
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public void onSuccess(Map json){
+        complete = true;
+        this.response = json;
+        if(listener != null){
+            Display.getInstance().callSerially(new Runnable(){
+                public void run(){
+                    listener.actionPerformed(new ActionEvent(json));
+                }
+            });
+        }
+        synchronized(completeLock) {
+            completeLock.notifyAll();
+        }
+    }
+
+    public void sendResult(String jsonStr) {
+        try {
+            sendResult(JSONParserUtils.parse(jsonStr));
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public void sendResult(Map json){
+        complete = true;
+        this.response = json;
+        if(listener != null){
+            Display.getInstance().callSerially(new Runnable(){
+                public void run(){
+                    listener.actionPerformed(new ActionEvent(json));
+                }
+            });
+        }
+        synchronized(completeLock) {
+            completeLock.notifyAll();
+        }
+    }
+
+    public Map getResponse() {
         return response;
     }
     
-    public AsyncResource<JSONObject> getResponseAsync(int timeout) {
+    public AsyncResource<Map> getResponseAsync(int timeout) {
         
         long absTimeout = System.currentTimeMillis() + timeout;
-        AsyncResource<JSONObject> out = new AsyncResource<JSONObject>();
+        AsyncResource<Map> out = new AsyncResource<Map>();
         if (!complete) {
             new Thread(()->{
                 while (!complete) {
@@ -101,16 +134,12 @@ public class CordovaCallback {
         
     }
     
-    public JSONObject getResponseAndWait(int timeout) {
+    public Map getResponseAndWait(int timeout) {
         return getResponseAsync(timeout).get();
     }
     
     public boolean isError(){
-        try {
-            return response != null && response.getString("error") != null;
-        } catch (JSONException ex) {
-        }
-        return false;
+        return response != null && response.containsKey("error");
     }
     
 }

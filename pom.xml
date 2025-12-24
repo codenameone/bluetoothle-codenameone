@@ -303,10 +303,5 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
-        <repository>
-            <id>project.local</id>
-            <name>project</name>
-            <url>file:${session.executionRootDirectory}/repo</url>
-        </repository>
     </repositories>
 </project>

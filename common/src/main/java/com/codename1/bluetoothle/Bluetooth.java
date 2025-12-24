@@ -5,15 +5,15 @@
  */
 package com.codename1.bluetoothle;
 
-import ca.weblite.codename1.json.JSONException;
-import ca.weblite.codename1.json.JSONObject;
 import com.codename1.cordova.CordovaCallback;
 import com.codename1.cordova.Cordova;
 import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.JSONUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
@@ -57,28 +57,32 @@ public class Bluetooth {
         plugin = new Cordova();
     }
 
+    private boolean getBoolean(Map m, String key) {
+        if (m == null) return false;
+        Object v = m.get(key);
+        if (v instanceof Boolean) return (Boolean)v;
+        if (v instanceof String) return "true".equalsIgnoreCase((String)v);
+        return false;
+    }
+
     public boolean initialize(boolean request, boolean statusReceiver, String restoreKey) throws IOException {
         HashMap p = new HashMap();
         p.put("request", request);
         p.put("statusReceiver", statusReceiver);
         p.put("restoreKey", restoreKey);
-        JSONObject j = new JSONObject(p);
         CordovaCallback callack = new CordovaCallback();
-        plugin.execute("initialize", j.toString(), callack);
+        plugin.execute("initialize", JSONUtils.toJSON(p), callack);
         if ("ios".equalsIgnoreCase(CN.getPlatformName())) {
             // On iOS, it seems that initialize doesn't return.
             // Not sure why, but it seems to work fine in most cases without it.
             // Just assume that it worked.
             return true;
         }
-        try {
-            JSONObject obj = callack.getResponseAndWait(2000);
-            if (obj != null) {
-                String status = (String) obj.get("status");
-                return status.equals("enabled");
-            }
-        } catch (JSONException ex) {
-            ex.printStackTrace();
+
+        Map obj = callack.getResponseAndWait(2000);
+        if (obj != null) {
+            String status = (String) obj.get("status");
+            return "enabled".equals(status);
         }
         return false;
     }
@@ -109,18 +113,12 @@ public class Bluetooth {
         p.put("matchNum", matchNum);
         p.put("callbackType", callbackType);
 
-        JSONObject j = new JSONObject(p);
         if (services != null && services.size() > 0) {
-            try {
-                j.put("services", services);
-
-            } catch (JSONException ex) {
-                ex.printStackTrace();
-            }
+            p.put("services", services);
         }
 
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("startScan", j.toString(), callack);
+        plugin.execute("startScan", JSONUtils.toJSON(p), callack);
     }
 
     public void stopScan() throws IOException {
@@ -129,53 +127,44 @@ public class Bluetooth {
     }
 
     public void retrieveConnected(ActionListener callback, ArrayList services) throws IOException {
-        JSONObject j = new JSONObject();
+        HashMap j = new HashMap();
         if (services != null && services.size() > 0) {
-            try {
-                j.put("services", services);
-
-            } catch (JSONException ex) {
-                ex.printStackTrace();
-            }
+            j.put("services", services);
         }
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("retrieveConnected", j.toString(), callack);
+        plugin.execute("retrieveConnected", JSONUtils.toJSON(j), callack);
     }
 
     public void connect(ActionListener callback, String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("connect", j.toString(), callack);
+        plugin.execute("connect", JSONUtils.toJSON(p), callack);
     }
 
     public void reconnect(ActionListener callback, String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("reconnect", j.toString(), callack);
+        plugin.execute("reconnect", JSONUtils.toJSON(p), callack);
     }
 
     public void disconnect(String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback();
-        plugin.execute("disconnect", j.toString(), callack);
+        plugin.execute("disconnect", JSONUtils.toJSON(p), callack);
     }
 
     public void close(String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback();
-        plugin.execute("close", j.toString(), callack);
+        plugin.execute("close", JSONUtils.toJSON(p), callack);
     }
 
     /**
@@ -187,27 +176,20 @@ public class Bluetooth {
     public void discover(ActionListener callback, String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("discover", j.toString(), callack);
+        plugin.execute("discover", JSONUtils.toJSON(p), callack);
     }
 
     public void services(ActionListener callback, String address, ArrayList services) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
         if (services != null && services.size() > 0) {
-            try {
-                j.put("services", services);
-
-            } catch (JSONException ex) {
-                ex.printStackTrace();
-            }
+            p.put("services", services);
         }
 
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("services", j.toString(), callack);
+        plugin.execute("services", JSONUtils.toJSON(p), callack);
     }
 
     public void characteristics(ActionListener callback, String address, String service, ArrayList characteristics) throws IOException {
@@ -215,15 +197,12 @@ public class Bluetooth {
         p.put("address", address);
         p.put("service", service);
 
-        JSONObject j = new JSONObject(p);
-        try {
-            j.put("characteristics", characteristics);
-        } catch (JSONException ex) {
-            ex.printStackTrace();
+        if (characteristics != null) {
+            p.put("characteristics", characteristics);
         }
 
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("characteristics", j.toString(), callack);
+        plugin.execute("characteristics", JSONUtils.toJSON(p), callack);
     }
 
     public void descriptors(ActionListener callback, String address, String service, String characteristic) throws IOException {
@@ -232,10 +211,8 @@ public class Bluetooth {
         p.put("service", service);
         p.put("characteristic", characteristic);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("descriptors", j.toString(), callack);
+        plugin.execute("descriptors", JSONUtils.toJSON(p), callack);
     }
 
     public void read(ActionListener callback, String address, String service, String characteristic) throws IOException {
@@ -244,10 +221,8 @@ public class Bluetooth {
         p.put("service", service);
         p.put("characteristic", characteristic);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("read", j.toString(), callack);
+        plugin.execute("read", JSONUtils.toJSON(p), callack);
     }
 
     public void subscribe(ActionListener callback, String address, String service, String characteristic) throws IOException {
@@ -256,10 +231,8 @@ public class Bluetooth {
         p.put("service", service);
         p.put("characteristic", characteristic);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("subscribe", j.toString(), callack);
+        plugin.execute("subscribe", JSONUtils.toJSON(p), callack);
     }
 
     public void unsubscribe(ActionListener callback, String address, String service, String characteristic) throws IOException {
@@ -268,10 +241,8 @@ public class Bluetooth {
         p.put("service", service);
         p.put("characteristic", characteristic);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("unsubscribe", j.toString(), callack);
+        plugin.execute("unsubscribe", JSONUtils.toJSON(p), callack);
     }
 
     public void write(ActionListener callback, String address, String service, String characteristic, String value, boolean noResponse) throws IOException {
@@ -284,10 +255,8 @@ public class Bluetooth {
             p.put("type", "noResponse");
         }
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("write", j.toString(), callack);
+        plugin.execute("write", JSONUtils.toJSON(p), callack);
     }
 
     public void writeQ(ActionListener callback, String address, String service, String characteristic, String value, boolean noResponse) throws IOException {
@@ -300,10 +269,8 @@ public class Bluetooth {
             p.put("type", "noResponse");
         }
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("writeQ", j.toString(), callack);
+        plugin.execute("writeQ", JSONUtils.toJSON(p), callack);
     }
 
     public void readDescriptor(ActionListener callback, String address, String service, String characteristic, String descriptor) throws IOException {
@@ -313,10 +280,8 @@ public class Bluetooth {
         p.put("characteristic", characteristic);
         p.put("descriptor", descriptor);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("readDescriptor", j.toString(), callack);
+        plugin.execute("readDescriptor", JSONUtils.toJSON(p), callack);
     }
 
     public void writeDescriptor(ActionListener callback, String address, String service, String characteristic, String descriptor, String value) throws IOException {
@@ -327,20 +292,16 @@ public class Bluetooth {
         p.put("descriptor", descriptor);
         p.put("value", value);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("writeDescriptor", j.toString(), callack);
+        plugin.execute("writeDescriptor", JSONUtils.toJSON(p), callack);
     }
 
     public void rssi(ActionListener callback, String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("rssi", j.toString(), callack);
+        plugin.execute("rssi", JSONUtils.toJSON(p), callack);
     }
 
     /**
@@ -355,10 +316,8 @@ public class Bluetooth {
         p.put("address", address);
         p.put("mtu", mtu);
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("mtu", j.toString(), callack);
+        plugin.execute("mtu", JSONUtils.toJSON(p), callack);
     }
 
     /**
@@ -380,89 +339,60 @@ public class Bluetooth {
             p.put("connectionPriority", "high");
         }
 
-        JSONObject j = new JSONObject(p);
-
         CordovaCallback callack = new CordovaCallback(callback);
-        plugin.execute("requestConnectionPriority", j.toString(), callack);
+        plugin.execute("requestConnectionPriority", JSONUtils.toJSON(p), callack);
     }
 
     public boolean isInitialized() throws IOException {
         CordovaCallback callack = new CordovaCallback();
         plugin.execute("isInitialized", "", callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("isInitialized");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "isInitialized");
     }
 
     public boolean isEnabled() throws IOException {
         CordovaCallback callack = new CordovaCallback();
         plugin.execute("isEnabled", "", callack);
-        try {
-            System.out.println("Waiting for response in isEnabled()");
-            return callack.getResponseAndWait(500).getBoolean("isEnabled");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        System.out.println("Waiting for response in isEnabled()");
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "isEnabled");
     }
 
     public boolean isScanning() throws IOException {
         CordovaCallback callack = new CordovaCallback();
         plugin.execute("isScanning", "", callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("isScanning");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "isScanning");
     }
 
     public boolean wasConnected(String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback();
-        plugin.execute("wasConnected", j.toString(), callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("wasConnected");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        plugin.execute("wasConnected", JSONUtils.toJSON(p), callack);
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "wasConnected");
     }
 
     public boolean isConnected(String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback();
-        plugin.execute("isConnected", j.toString(), callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("isConnected");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        plugin.execute("isConnected", JSONUtils.toJSON(p), callack);
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "isConnected");
     }
 
     public boolean isDiscovered(String address) throws IOException {
         HashMap p = new HashMap();
         p.put("address", address);
-        JSONObject j = new JSONObject(p);
 
         CordovaCallback callack = new CordovaCallback();
-        plugin.execute("isDiscovered", j.toString(), callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("isDiscovered");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        plugin.execute("isDiscovered", JSONUtils.toJSON(p), callack);
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "isDiscovered");
     }
 
     /**
@@ -474,12 +404,8 @@ public class Bluetooth {
 
         CordovaCallback callack = new CordovaCallback();
         plugin.execute("hasPermission", "", callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("hasPermission");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "hasPermission");
     }
 
     /**
@@ -491,12 +417,8 @@ public class Bluetooth {
 
         CordovaCallback callack = new CordovaCallback();
         plugin.execute("requestPermission", "", callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("requestPermission");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "requestPermission");
     }
 
     /**
@@ -508,12 +430,8 @@ public class Bluetooth {
 
         CordovaCallback callack = new CordovaCallback();
         plugin.execute("isLocationEnabled", "", callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("isLocationEnabled");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "isLocationEnabled");
     }
 
     /**
@@ -525,12 +443,8 @@ public class Bluetooth {
 
         CordovaCallback callack = new CordovaCallback();
         plugin.execute("requestLocation", "", callack);
-        try {
-            return callack.getResponseAndWait(500).getBoolean("requestLocation");
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-        }
-        return false;
+        Map response = callack.getResponseAndWait(500);
+        return getBoolean(response, "requestLocation");
     }
 
 }
