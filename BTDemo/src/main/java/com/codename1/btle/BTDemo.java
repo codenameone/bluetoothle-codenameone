@@ -1,7 +1,5 @@
 package com.codename1.btle;
 
-import ca.weblite.codename1.json.JSONException;
-import ca.weblite.codename1.json.JSONObject;
 import com.codename1.bluetoothle.Bluetooth;
 import com.codename1.components.MultiButton;
 import com.codename1.ui.Display;
@@ -96,19 +94,17 @@ public class BTDemo {
 
                         @Override
                         public void actionPerformed(ActionEvent evt) {
-                            try {
-                                JSONObject res = (JSONObject) evt.getSource();
-                                System.out.println("response " + res);
+                            Map res = (Map) evt.getSource();
+                            System.out.println("response " + res);
 
-                                if (res.getString("status").equals("scanResult")) {
-                                    //if this is a new device add it
-                                    if (!devices.containsKey(res.getString("address"))) {
-                                        devices.put(res.getString("address"), res);
-                                        updateUI();
-                                    }
+                            String status = (String) res.get("status");
+                            if ("scanResult".equals(status)) {
+                                //if this is a new device add it
+                                String address = (String) res.get("address");
+                                if (!devices.containsKey(address)) {
+                                    devices.put(address, res);
+                                    updateUI();
                                 }
-                            } catch (JSONException ex) {
-                                ex.printStackTrace();
                             }
                         }
                     }, null, true, Bluetooth.SCAN_MODE_LOW_POWER, Bluetooth.MATCH_MODE_STICKY,
@@ -147,13 +143,13 @@ public class BTDemo {
     public void destroy() {
     }
 
-    private void updateUI() throws JSONException {
+    private void updateUI() {
         devicesCnt.removeAll();
         Set keys = devices.keySet();
         for (Iterator iterator = keys.iterator(); iterator.hasNext();) {
             String address = (String) iterator.next();
-            JSONObject obj = (JSONObject) devices.get(address);
-            MultiButton mb = new MultiButton(obj.getString("name"));
+            Map obj = (Map) devices.get(address);
+            MultiButton mb = new MultiButton((String) obj.get("name"));
             mb.setTextLine2(address);
             devicesCnt.add(mb);
         }
