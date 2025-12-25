@@ -47,11 +47,15 @@ function info() {
 
 function ensure_sdk_tools() {
   local sdkmanager_bin
-  # Prefer explicitly installed latest tools
+
+  # Try to find sdkmanager in standard locations
   if [[ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]]; then
     sdkmanager_bin="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+  elif [[ -x "$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager" ]]; then
+     # GitHub Actions often has 16.0 explicitly
+     sdkmanager_bin="$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
   else
-    sdkmanager_bin=$(command -v sdkmanager)
+    sdkmanager_bin=$(command -v sdkmanager || true)
   fi
 
   if [[ -z "$sdkmanager_bin" ]]; then
@@ -59,17 +63,10 @@ function ensure_sdk_tools() {
     exit 1
   fi
 
-  info "Updating SDK tools..."
-  # Update cmdline-tools first to avoid XML parsing errors with newer repos
-  yes | "$sdkmanager_bin" --licenses >/dev/null || true
-  "$sdkmanager_bin" --install "cmdline-tools;latest" >/dev/null
-
-  # Refresh binary path
-  sdkmanager_bin="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-
-  info "Installing system image..."
-  yes | "$sdkmanager_bin" --licenses >/dev/null || true
-  "$sdkmanager_bin" --install "platform-tools" "emulator" "$AVD_PACKAGE" >/dev/null
+  info "Installing system image using $sdkmanager_bin..."
+  # Use yes to accept licenses, suppress broken pipe errors if yes continues after sdkmanager exits
+  # We invoke sdkmanager with --sdk_root to be explicit
+  yes | "$sdkmanager_bin" --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "emulator" "$AVD_PACKAGE" >/dev/null || true
 }
 
 function create_avd() {
@@ -92,10 +89,15 @@ function start_emulator() {
     exit 1
   fi
   info "Starting emulator $AVD_NAME on port $EMULATOR_PORT"
-  # Avoid stale instances
-  if pgrep -f "-avd $AVD_NAME" >/dev/null; then
-    pkill -9 -f "-avd $AVD_NAME"
+
+  # Avoid stale instances safely
+  if pgrep -f "emulator -avd $AVD_NAME" >/dev/null; then
+    pkill -9 -f "emulator -avd $AVD_NAME" || true
   fi
+
+  # Ensure log directory exists
+  local log_dir="$HOME/.android/avd/$AVD_NAME"
+  mkdir -p "$log_dir"
 
   # Launch headless emulator
   "${emulator_bin}" -avd "$AVD_NAME" \
@@ -109,7 +111,7 @@ function start_emulator() {
     -camera-front none \
     -verbose \
     ${EMULATOR_FLAGS:-} \
-    >"$HOME/.android/avd/$AVD_NAME/emulator.log" 2>&1 &
+    >"$log_dir/emulator.log" 2>&1 &
 }
 
 function wait_for_boot() {
@@ -121,12 +123,18 @@ function wait_for_boot() {
   local attempts=0
   until [[ "$booted" == "1" ]]; do
     booted=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
-    sleep 3
-    ((attempts++))
-    if (( attempts > 120 )); then
-      info "Emulator failed to boot"
-      tail -n 200 "$HOME/.android/avd/$AVD_NAME/emulator.log" || true
-      exit 1
+    if [[ "$booted" != "1" ]]; then
+        sleep 3
+        ((attempts++))
+        if (( attempts > 120 )); then
+          info "Emulator failed to boot"
+          if [[ -f "$HOME/.android/avd/$AVD_NAME/emulator.log" ]]; then
+             tail -n 200 "$HOME/.android/avd/$AVD_NAME/emulator.log" || true
+          else
+             echo "No emulator log found."
+          fi
+          exit 1
+        fi
     fi
   done
   info "Emulator booted"

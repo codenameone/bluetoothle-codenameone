@@ -39,7 +39,7 @@ function info() {
 
 function ensure_device() {
   # Try to find the exact runtime first, or fallback to the latest available iOS runtime
-  # We extract the last column which is the runtime identifier (e.g. com.apple.CoreSimulator.SimRuntime.iOS-17-2)
+  # We extract the last column which is the runtime identifier
   local runtime_id
   runtime_id=$(xcrun simctl list runtimes | awk -v r="$SIM_RUNTIME" '/com.apple.CoreSimulator.SimRuntime/ && $0 ~ r {print $NF}' | sort | tail -n 1)
 
@@ -57,10 +57,7 @@ function ensure_device() {
   info "Selected runtime: $runtime_id"
 
   local existing
-  # Escape parenthesis for awk regex or use index
-  # We look for: Name (UUID) ... RuntimeID
-  # awk '$0 ~ n" (" ...' failed because of the open parenthesis in regex.
-  # We can check if line starts with "$SIM_DEVICE_NAME ("
+  # Safely extract UDID using grep and delimiter-based awk to avoid regex issues with parenthesis
   existing=$(xcrun simctl list devices "$runtime_id" | grep -F "$SIM_DEVICE_NAME (" | head -n 1 | awk -F '[()]' '{print $2}')
 
   if [[ -n $existing ]]; then
@@ -69,11 +66,7 @@ function ensure_device() {
   fi
 
   # Create device
-  # Usage: xcrun simctl create <name> <device_type_id> <runtime_id>
   local device_type="com.apple.CoreSimulator.SimDeviceType.iPhone-15"
-  # Verify device type exists, fallback to generic if iPhone 15 missing?
-  # For now assume iPhone-15 exists on macos-15 runner.
-
   local udid
   udid=$(xcrun simctl create "$SIM_DEVICE_NAME" "$device_type" "$runtime_id")
   echo "$udid"
@@ -83,7 +76,26 @@ function boot_device() {
   local udid=$1
   info "Booting simulator $SIM_DEVICE_NAME ($udid)"
   xcrun simctl boot "$udid" >/dev/null 2>&1 || true
-  xcrun simctl bootstatus "$udid" -b --timeout "$SIM_TIMEOUT"
+
+  # Wait for boot completion manually since --timeout might be unsupported on some versions
+  info "Waiting for boot status..."
+  local attempts=0
+  local booted="false"
+  while [[ "$booted" == "false" ]]; do
+    local state
+    state=$(xcrun simctl list devices | grep "$udid" | grep "(Booted)" || true)
+    if [[ -n "$state" ]]; then
+      booted="true"
+    else
+      sleep 5
+      ((attempts+=5))
+      if (( attempts > SIM_TIMEOUT )); then
+        echo "Timeout waiting for simulator boot" >&2
+        exit 1
+      fi
+    fi
+  done
+  info "Simulator booted"
 }
 
 function install_and_launch() {
