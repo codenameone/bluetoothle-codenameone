@@ -34,17 +34,17 @@ SIM_RUNTIME=${SIM_RUNTIME:-"iOS"}
 SIM_TIMEOUT=${SIM_TIMEOUT:-180}
 
 function info() {
-  echo "[ios-sim] $*"
+  echo "[ios-sim] $*" >&2
 }
 
 function ensure_device() {
   # Try to find the exact runtime first, or fallback to the latest available iOS runtime
+  # We extract the last column which is the runtime identifier (e.g. com.apple.CoreSimulator.SimRuntime.iOS-17-2)
   local runtime_id
-  runtime_id=$(xcrun simctl list runtimes | awk -v r="$SIM_RUNTIME" '/com.apple.CoreSimulator.SimRuntime/ && $0 ~ r {print $2}' | sort | tail -n 1)
+  runtime_id=$(xcrun simctl list runtimes | awk -v r="$SIM_RUNTIME" '/com.apple.CoreSimulator.SimRuntime/ && $0 ~ r {print $NF}' | sort | tail -n 1)
 
-  # If still not found and SIM_RUNTIME was generic "iOS", look for any iOS runtime
   if [[ -z $runtime_id && "$SIM_RUNTIME" == "iOS" ]]; then
-     runtime_id=$(xcrun simctl list runtimes | awk '/com.apple.CoreSimulator.SimRuntime.iOS/ {print $2}' | sort | tail -n 1)
+     runtime_id=$(xcrun simctl list runtimes | awk '/com.apple.CoreSimulator.SimRuntime.iOS/ {print $NF}' | sort | tail -n 1)
   fi
 
   if [[ -z $runtime_id ]]; then
@@ -57,14 +57,26 @@ function ensure_device() {
   info "Selected runtime: $runtime_id"
 
   local existing
-  existing=$(xcrun simctl list devices | awk -v n="$SIM_DEVICE_NAME" -v r="$runtime_id" '$0 ~ n" (" && $0 ~ r {print $1}')
+  # Escape parenthesis for awk regex or use index
+  # We look for: Name (UUID) ... RuntimeID
+  # awk '$0 ~ n" (" ...' failed because of the open parenthesis in regex.
+  # We can check if line starts with "$SIM_DEVICE_NAME ("
+  existing=$(xcrun simctl list devices "$runtime_id" | grep -F "$SIM_DEVICE_NAME (" | head -n 1 | awk -F '[()]' '{print $2}')
+
   if [[ -n $existing ]]; then
     echo "$existing"
     return
   fi
-  xcrun simctl create "$SIM_DEVICE_NAME" "$runtime_id" "com.apple.CoreSimulator.SimDeviceType.iPhone-15"
-  existing=$(xcrun simctl list devices | awk -v n="$SIM_DEVICE_NAME" -v r="$runtime_id" '$0 ~ n" (" && $0 ~ r {print $1}')
-  echo "$existing"
+
+  # Create device
+  # Usage: xcrun simctl create <name> <device_type_id> <runtime_id>
+  local device_type="com.apple.CoreSimulator.SimDeviceType.iPhone-15"
+  # Verify device type exists, fallback to generic if iPhone 15 missing?
+  # For now assume iPhone-15 exists on macos-15 runner.
+
+  local udid
+  udid=$(xcrun simctl create "$SIM_DEVICE_NAME" "$device_type" "$runtime_id")
+  echo "$udid"
 }
 
 function boot_device() {

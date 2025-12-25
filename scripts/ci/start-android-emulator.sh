@@ -46,12 +46,30 @@ function info() {
 }
 
 function ensure_sdk_tools() {
-  if ! command -v sdkmanager >/dev/null; then
+  local sdkmanager_bin
+  # Prefer explicitly installed latest tools
+  if [[ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]]; then
+    sdkmanager_bin="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+  else
+    sdkmanager_bin=$(command -v sdkmanager)
+  fi
+
+  if [[ -z "$sdkmanager_bin" ]]; then
     echo "sdkmanager not found in ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >&2
     exit 1
   fi
-  yes | sdkmanager --licenses >/dev/null
-  sdkmanager --install "platform-tools" "emulator" "$AVD_PACKAGE"
+
+  info "Updating SDK tools..."
+  # Update cmdline-tools first to avoid XML parsing errors with newer repos
+  yes | "$sdkmanager_bin" --licenses >/dev/null || true
+  "$sdkmanager_bin" --install "cmdline-tools;latest" >/dev/null
+
+  # Refresh binary path
+  sdkmanager_bin="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+
+  info "Installing system image..."
+  yes | "$sdkmanager_bin" --licenses >/dev/null || true
+  "$sdkmanager_bin" --install "platform-tools" "emulator" "$AVD_PACKAGE" >/dev/null
 }
 
 function create_avd() {
