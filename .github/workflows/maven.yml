@@ -32,6 +32,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools emulator system-images;android-33;google_apis;x86_64
       - name: Set JAVA17_HOME
         run: echo "JAVA17_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Install Java 11
@@ -45,10 +49,6 @@ jobs:
           wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
       - name: Install Libraries (JDK 11)
         run: mvn install -DskipTests
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools emulator system-images;android-33;google_apis;x86_64
       - name: Enable KVM
         run: |
           sudo apt-get update
@@ -64,6 +64,7 @@ jobs:
       - name: Boot emulator and run smoke test
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
           ./scripts/ci/start-android-emulator.sh
           adb install -r BTDemo/target/*-android-device.apk

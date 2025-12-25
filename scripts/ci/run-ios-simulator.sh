@@ -11,7 +11,7 @@ Environment variables:
   APP_BUNDLE        Path to the .app bundle to install (required).
   BUNDLE_ID         Bundle identifier used to launch the app (required).
   SIM_DEVICE_NAME   Simulator name to create/use. Default: iPhone 15
-  SIM_RUNTIME       Simulator runtime identifier. Default: iOS 17.2
+  SIM_RUNTIME       Simulator runtime identifier. Default: iOS (auto-detect latest)
   SIM_TIMEOUT       Seconds to wait for boot and launch. Default: 180
 
 The script will create the simulator if missing, boot it headlessly,
@@ -30,7 +30,7 @@ if [[ -z ${APP_BUNDLE:-} || -z ${BUNDLE_ID:-} ]]; then
 fi
 
 SIM_DEVICE_NAME=${SIM_DEVICE_NAME:-"iPhone 15"}
-SIM_RUNTIME=${SIM_RUNTIME:-"iOS 17.2"}
+SIM_RUNTIME=${SIM_RUNTIME:-"iOS"}
 SIM_TIMEOUT=${SIM_TIMEOUT:-180}
 
 function info() {
@@ -38,12 +38,24 @@ function info() {
 }
 
 function ensure_device() {
+  # Try to find the exact runtime first, or fallback to the latest available iOS runtime
   local runtime_id
-  runtime_id=$(xcrun simctl list runtimes | awk -v r="$SIM_RUNTIME" '/com.apple.CoreSimulator.SimRuntime/ && $0 ~ r {print $2}')
+  runtime_id=$(xcrun simctl list runtimes | awk -v r="$SIM_RUNTIME" '/com.apple.CoreSimulator.SimRuntime/ && $0 ~ r {print $2}' | sort | tail -n 1)
+
+  # If still not found and SIM_RUNTIME was generic "iOS", look for any iOS runtime
+  if [[ -z $runtime_id && "$SIM_RUNTIME" == "iOS" ]]; then
+     runtime_id=$(xcrun simctl list runtimes | awk '/com.apple.CoreSimulator.SimRuntime.iOS/ {print $2}' | sort | tail -n 1)
+  fi
+
   if [[ -z $runtime_id ]]; then
-    echo "Simulator runtime $SIM_RUNTIME not found" >&2
+    echo "Simulator runtime matching '$SIM_RUNTIME' not found" >&2
+    echo "Available runtimes:" >&2
+    xcrun simctl list runtimes >&2
     exit 1
   fi
+
+  info "Selected runtime: $runtime_id"
+
   local existing
   existing=$(xcrun simctl list devices | awk -v n="$SIM_DEVICE_NAME" -v r="$runtime_id" '$0 ~ n" (" && $0 ~ r {print $1}')
   if [[ -n $existing ]]; then
