@@ -37,10 +37,7 @@ jobs:
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |-
-            platform-tools
-            emulator
-            system-images;android-33;google_apis;x86_64
+          packages: platform-tools emulator system-images;android-33;google_apis;x86_64
       - name: Enable KVM
         run: |
           sudo apt-get update
@@ -49,7 +46,6 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger
       - name: Build app with Maven Central artifacts
         run: |
-          APP_REPO=https://github.com/codenameone/HelloCodenameOneMaven \
           CODENAMEONE_VERSION=LATEST \
           ./scripts/ci/build-thirdparty-app.sh android
       - name: Boot emulator and run smoke test
@@ -62,7 +58,7 @@ jobs:
           adb logcat -d | tail -n 200
 
   ios:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Install Java 17
@@ -73,7 +69,6 @@ jobs:
       - name: Build simulator bundle from Maven Central
         run: |
           BUILD_TARGET=ios-sim \
-          APP_REPO=https://github.com/codenameone/HelloCodenameOneMaven \
           ./scripts/ci/build-thirdparty-app.sh ios
       - name: Boot simulator, install, and launch
         env:

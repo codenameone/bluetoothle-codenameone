@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.codename1.hellocodenameone</groupId>
+  <artifactId>HelloCodenameOne</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <cn1.version>7.0.100</cn1.version>
+    <cn1.plugin.version>7.0.100</cn1.plugin.version>
+    <maven.compiler.source>8</maven.compiler.source>
+    <maven.compiler.target>8</maven.compiler.target>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-core</artifactId>
+      <version>${cn1.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-javase</artifactId>
+      <version>${cn1.version}</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-maven-plugin</artifactId>
+        <version>${cn1.plugin.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>build</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <mainClassName>com.codename1.hellocodenameone.HelloCodenameOne</mainClassName>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
