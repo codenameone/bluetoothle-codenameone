@@ -26,7 +26,7 @@ jobs:
 
   android:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install Java 17
@@ -34,10 +34,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools emulator system-images;android-33;google_apis;x86_64
       - name: Set JAVA17_HOME
         run: echo "JAVA17_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Install Java 11
@@ -51,31 +47,34 @@ jobs:
           wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
       - name: Install Libraries (JDK 11)
         run: mvn install -DskipTests
-      - name: Enable KVM
+      - name: Enable KVM for Android emulator
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
-          sudo usermod -aG kvm $USER
-          sudo udevadm control --reload-rules && sudo udevadm trigger
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Build BTDemo (JDK 17)
         env:
           APP_DIR: BTDemo
           JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
           ./scripts/ci/build-thirdparty-app.sh android
-      - name: Boot emulator and run smoke test
-        env:
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-          JAVA_HOME: ${{ env.JAVA17_HOME }}
-        run: |
-          ./scripts/ci/start-android-emulator.sh
-          adb install -r BTDemo/target/*-android-device.apk
-          adb shell am start -n com.codename1.btle/.BTDemoStub
-          adb logcat -d | tail -n 200
+      - name: Run Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          arch: x86_64
+          target: google_apis
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb install -r BTDemo/target/*-android-device.apk
+            adb shell am start -n com.codename1.btle/.BTDemoStub
+            adb logcat -d | tail -n 200
 
   ios:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install Java 11
@@ -89,17 +88,35 @@ jobs:
           wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
       - name: Install Libraries (JDK 11)
         run: mvn install -DskipTests
-      - name: Build BTDemo Simulator Bundle
+      - name: Build BTDemo Source (Maven)
         env:
           APP_DIR: BTDemo
-          BUILD_TARGET: ios-sim
+          BUILD_TARGET: ios-source
         run: |
           ./scripts/ci/build-thirdparty-app.sh ios
-      - name: Debug Output Artifacts
-        run: ls -R BTDemo/target || true
+      - name: Compile iOS App (Xcode)
+        run: |
+          # Find the generated Xcode project
+          XCODE_PROJ=$(find BTDemo/target -name "*.xcodeproj" -type d | head -n 1)
+          if [[ -z "$XCODE_PROJ" ]]; then
+            echo "Error: Xcode project not found in BTDemo/target"
+            ls -R BTDemo/target
+            exit 1
+          fi
+          echo "Found Xcode project: $XCODE_PROJ"
+
+          # Build the app for the simulator
+          xcodebuild -project "$XCODE_PROJ" \
+            -scheme "BTDemo" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,name=iPhone 15" \
+            CONFIGURATION_BUILD_DIR=build/ios-sim \
+            clean build
+
       - name: Boot simulator, install, and launch
         env:
-          APP_BUNDLE: BTDemo/target/ios-sim/BTDemo.app
+          APP_BUNDLE: build/ios-sim/BTDemo.app
           BUNDLE_ID: com.codename1.btle
         run: |
           ./scripts/ci/run-ios-simulator.sh
