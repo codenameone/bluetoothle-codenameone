@@ -24,3 +24,84 @@ jobs:
         wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
     - name: Build with Maven
       run: mvn install
+
+  android-emulator:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |-
+            platform-tools
+            emulator
+            system-images;android-33;google_apis;x86_64
+
+      - name: Enable KVM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+          sudo usermod -aG kvm $USER
+          sudo udevadm control --reload-rules && sudo udevadm trigger
+
+      - name: Build app with Maven Central artifacts
+        run: |
+          # Use local BTDemo directory
+          APP_DIR=$PWD/BTDemo \
+          CODENAMEONE_VERSION=7.0.26 \
+          BUILD_TARGET=android-source \
+          ./scripts/ci/build-thirdparty-app.sh android
+
+      - name: Build APK from Source
+        run: |
+          # The generated project should be in scripts/ci/.thirdparty-app/app/target
+          # We search for it
+
+          # Find the android project directory (contains build.gradle)
+          # We look inside the work dir used by the script
+          ANDROID_PROJECT_DIR=$(find scripts/ci/.thirdparty-app/app/target -name "build.gradle" | grep "android" | xargs dirname)
+
+          if [ -z "$ANDROID_PROJECT_DIR" ]; then
+             echo "Could not find generated Android project"
+             find scripts/ci/.thirdparty-app/app/target
+             exit 1
+          fi
+
+          echo "Found Android project at $ANDROID_PROJECT_DIR"
+          cd "$ANDROID_PROJECT_DIR"
+
+          # Ensure gradlew is executable
+          chmod +x gradlew
+
+          # Build APK
+          ./gradlew assembleDebug
+
+      - name: Boot emulator and run smoke test
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          ./scripts/ci/start-android-emulator.sh
+
+          # Find the generated APK
+          # It should be in the android project dir/app/build/outputs/apk/debug/
+          # But we are relative to root now
+
+          APK_PATH=$(find scripts/ci/.thirdparty-app/app/target -name "*.apk" | head -n 1)
+
+          if [ -z "$APK_PATH" ]; then
+             echo "Could not find built APK"
+             find scripts/ci/.thirdparty-app/app/target
+             exit 1
+          fi
+
+          echo "Installing APK from $APK_PATH"
+          adb install -r "$APK_PATH"
+
+          # Start the app
+          adb shell monkey -p com.codename1.btle 1
