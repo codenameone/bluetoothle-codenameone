@@ -100,6 +100,27 @@ function boot_device() {
 
 function install_and_launch() {
   local udid=$1
+
+  # Check if APP_BUNDLE exists
+  if [[ ! -e "$APP_BUNDLE" ]]; then
+    echo "Error: APP_BUNDLE not found at $APP_BUNDLE" >&2
+    echo "Listing contents of target directory:" >&2
+    # Assume APP_BUNDLE is something like BTDemo/target/ios-sim/BTDemo.app
+    # Try to list the parent directory to see what's there
+    local parent_dir
+    parent_dir=$(dirname "$APP_BUNDLE")
+    if [[ -d "$parent_dir" ]]; then
+      ls -F "$parent_dir" >&2
+    elif [[ -d "$(dirname "$parent_dir")" ]]; then
+      echo "Parent $parent_dir not found, listing grandparent:" >&2
+      ls -F "$(dirname "$parent_dir")" >&2
+    else
+        echo "Grandparent directory not found either." >&2
+        find . -maxdepth 4 -name "*.app" >&2
+    fi
+    exit 1
+  fi
+
   info "Installing $APP_BUNDLE"
   xcrun simctl install "$udid" "$APP_BUNDLE"
   info "Launching $BUNDLE_ID"

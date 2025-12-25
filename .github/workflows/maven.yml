@@ -95,6 +95,8 @@ jobs:
           BUILD_TARGET: ios-sim
         run: |
           ./scripts/ci/build-thirdparty-app.sh ios
+      - name: Debug Output Artifacts
+        run: ls -R BTDemo/target || true
       - name: Boot simulator, install, and launch
         env:
           APP_BUNDLE: BTDemo/target/ios-sim/BTDemo.app

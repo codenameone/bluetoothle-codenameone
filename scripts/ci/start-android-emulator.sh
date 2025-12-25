@@ -105,6 +105,7 @@ function start_emulator() {
     -no-window \
     -no-audio \
     -no-boot-anim \
+    -no-snapshot-save \
     -gpu swiftshader_indirect \
     -accel on \
     -camera-back none \
@@ -117,16 +118,18 @@ function start_emulator() {
 function wait_for_boot() {
   export ANDROID_ADB_SERVER_PORT="$ADB_SERVER_PORT"
   adb start-server >/dev/null
+  info "Waiting for device to become visible..."
   adb wait-for-device
-  info "Waiting for boot completion"
+
+  info "Waiting for boot completion..."
   local booted="0"
   local attempts=0
   until [[ "$booted" == "1" ]]; do
     booted=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
     if [[ "$booted" != "1" ]]; then
-        sleep 3
+        sleep 5
         ((attempts++))
-        if (( attempts > 120 )); then
+        if (( attempts > 60 )); then # 5 minutes timeout
           info "Emulator failed to boot"
           if [[ -f "$HOME/.android/avd/$AVD_NAME/emulator.log" ]]; then
              tail -n 200 "$HOME/.android/avd/$AVD_NAME/emulator.log" || true
