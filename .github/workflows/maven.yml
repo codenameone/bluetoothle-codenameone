@@ -8,9 +8,7 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Set up JDK 11
@@ -23,7 +21,7 @@ jobs:
         mkdir -p ~/.codenameone
         wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
     - name: Build with Maven
-      run: mvn install
+      run: mvn install -DskipTests
 
   android:
     runs-on: ubuntu-22.04
@@ -34,6 +32,19 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Set JAVA17_HOME
+        run: echo "JAVA17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Install Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p ~/.codenameone
+          wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
+      - name: Install Libraries (JDK 11)
+        run: mvn install -DskipTests
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -44,35 +55,45 @@ jobs:
           sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
           sudo usermod -aG kvm $USER
           sudo udevadm control --reload-rules && sudo udevadm trigger
-      - name: Build app with Maven Central artifacts
+      - name: Build BTDemo (JDK 17)
+        env:
+          APP_DIR: BTDemo
+          JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
-          CODENAMEONE_VERSION=LATEST \
           ./scripts/ci/build-thirdparty-app.sh android
       - name: Boot emulator and run smoke test
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
           ./scripts/ci/start-android-emulator.sh
-          adb install -r scripts/ci/.thirdparty-app/app/target/*-android-device.apk
-          adb shell am start -n com.codename1.hellocodenameone/.HelloCodenameOne
+          adb install -r BTDemo/target/*-android-device.apk
+          adb shell am start -n com.codename1.btle/.BTDemoStub
           adb logcat -d | tail -n 200
 
   ios:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Install Java 17
+      - name: Install Java 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-      - name: Build simulator bundle from Maven Central
+          java-version: '11'
+      - name: Setup Codename One Build Client
         run: |
-          BUILD_TARGET=ios-sim \
+          mkdir -p ~/.codenameone
+          wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
+      - name: Install Libraries (JDK 11)
+        run: mvn install -DskipTests
+      - name: Build BTDemo Simulator Bundle
+        env:
+          APP_DIR: BTDemo
+          BUILD_TARGET: ios-sim
+        run: |
           ./scripts/ci/build-thirdparty-app.sh ios
       - name: Boot simulator, install, and launch
         env:
-          APP_BUNDLE: scripts/ci/.thirdparty-app/app/target/ios-sim/HelloCodenameOne.app
-          BUNDLE_ID: com.codename1.hellocodenameone
+          APP_BUNDLE: BTDemo/target/ios-sim/BTDemo.app
+          BUNDLE_ID: com.codename1.btle
         run: |
           ./scripts/ci/run-ios-simulator.sh

@@ -1,3 +1,0 @@
-# Hello Codename One
-
-A minimal Codename One Maven project used for CI validation.
