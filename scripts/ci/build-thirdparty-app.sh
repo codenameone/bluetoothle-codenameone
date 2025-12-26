@@ -87,6 +87,10 @@ function build_target() {
     mvn_args+=("-Dcn1.plugin.version=$CODENAMEONE_PLUGIN_VERSION")
   fi
 
+  # Explicitly set the project directory to help the plugin find settings
+  # Assuming APP_WORK_DIR is relative to current directory or absolute
+  # We are already inside pushd APP_WORK_DIR, so project root is "."
+
   # Use cn1:build to generate native sources
   "$mvn_cmd" "${mvn_args[@]}" cn1:build
   popd >/dev/null
