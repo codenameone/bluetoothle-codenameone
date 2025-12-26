@@ -62,21 +62,22 @@ jobs:
         env:
           JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
-          # Find the generated Gradle project
-          GRADLE_PROJ=$(find BTDemo/target -name "build.gradle" -exec dirname {} \; | grep "android-source" | head -n 1)
-          if [[ -z "$GRADLE_PROJ" ]]; then
+          # Locate the Gradle project root
+          GRADLE_ROOT=$(find BTDemo/target -name "gradlew" -type f -exec dirname {} \; | head -n 1)
+
+          if [[ -z "$GRADLE_ROOT" ]]; then
             echo "Error: Gradle project not found in BTDemo/target"
+            echo "Listing BTDemo/target recursively:"
             ls -R BTDemo/target
             exit 1
           fi
-          echo "Found Gradle project: $GRADLE_PROJ"
 
-          # Build the APK
-          cd "$GRADLE_PROJ"
+          echo "Found Gradle project at: $GRADLE_ROOT"
+          cd "$GRADLE_ROOT"
           chmod +x gradlew
           ./gradlew assembleDebug
 
-          # Copy APK to a known location for the runner
+          # Move artifact to a predictable location
           mkdir -p ../../../../build/android
           find . -name "*.apk" -exec cp {} ../../../../build/android/app-debug.apk \;
 
@@ -120,11 +121,14 @@ jobs:
         run: |
           # Find the generated Xcode project
           XCODE_PROJ=$(find BTDemo/target -name "*.xcodeproj" -type d | head -n 1)
+
           if [[ -z "$XCODE_PROJ" ]]; then
             echo "Error: Xcode project not found in BTDemo/target"
+            echo "Listing BTDemo/target recursively:"
             ls -R BTDemo/target
             exit 1
           fi
+
           echo "Found Xcode project: $XCODE_PROJ"
 
           # Build the app for the simulator
