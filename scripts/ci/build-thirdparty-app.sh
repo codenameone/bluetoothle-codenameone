@@ -14,7 +14,7 @@ Options are provided via environment variables:
   CODENAMEONE_PLUGIN_VERSION
                      Codename One Maven plugin version.
   BUILD_TARGET       Overrides the codename1.buildTarget value passed to Maven.
-                     Defaults to android-device for android or ios-source for
+                     Defaults to android-source for android or ios-source for
                      ios.
 
 Examples:
@@ -61,7 +61,7 @@ function build_target() {
   local build_target
   case "$TARGET" in
     android)
-      build_target=${BUILD_TARGET:-android-device}
+      build_target=${BUILD_TARGET:-android-source}
       ;;
     ios)
       build_target=${BUILD_TARGET:-ios-source}
@@ -69,7 +69,7 @@ function build_target() {
   esac
 
   pushd "$APP_WORK_DIR" >/dev/null
-  info "Building $TARGET"
+  info "Building $TARGET (target: $build_target)"
 
   local mvn_args=(
     -B
@@ -87,7 +87,8 @@ function build_target() {
     mvn_args+=("-Dcn1.plugin.version=$CODENAMEONE_PLUGIN_VERSION")
   fi
 
-  "$mvn_cmd" "${mvn_args[@]}" package
+  # Use cn1:build to generate native sources
+  "$mvn_cmd" "${mvn_args[@]}" cn1:build
   popd >/dev/null
 }
 

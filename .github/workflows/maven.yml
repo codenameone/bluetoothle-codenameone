@@ -52,12 +52,34 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Build BTDemo (JDK 17)
+      - name: Build BTDemo Source (JDK 17)
         env:
           APP_DIR: BTDemo
           JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
           ./scripts/ci/build-thirdparty-app.sh android
+      - name: Compile APK (Gradle)
+        env:
+          JAVA_HOME: ${{ env.JAVA17_HOME }}
+        run: |
+          # Find the generated Gradle project
+          GRADLE_PROJ=$(find BTDemo/target -name "build.gradle" -exec dirname {} \; | grep "android-source" | head -n 1)
+          if [[ -z "$GRADLE_PROJ" ]]; then
+            echo "Error: Gradle project not found in BTDemo/target"
+            ls -R BTDemo/target
+            exit 1
+          fi
+          echo "Found Gradle project: $GRADLE_PROJ"
+
+          # Build the APK
+          cd "$GRADLE_PROJ"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+          # Copy APK to a known location for the runner
+          mkdir -p ../../../../build/android
+          find . -name "*.apk" -exec cp {} ../../../../build/android/app-debug.apk \;
+
       - name: Run Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -68,7 +90,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            adb install -r BTDemo/target/*-android-device.apk
+            adb install -r build/android/app-debug.apk
             adb shell am start -n com.codename1.btle/.BTDemoStub
             adb logcat -d | tail -n 200
 
