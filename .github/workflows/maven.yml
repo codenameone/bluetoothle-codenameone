@@ -57,7 +57,7 @@ jobs:
           APP_DIR: BTDemo
           JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
-          ./scripts/ci/build-thirdparty-app.sh android
+          .github/scripts/build-thirdparty-app.sh android
       - name: Compile APK (Gradle)
         env:
           JAVA_HOME: ${{ env.JAVA17_HOME }}
@@ -116,7 +116,7 @@ jobs:
           APP_DIR: BTDemo
           BUILD_TARGET: ios-source
         run: |
-          ./scripts/ci/build-thirdparty-app.sh ios
+          .github/scripts/build-thirdparty-app.sh ios
       - name: Compile iOS App (Xcode)
         run: |
           # Find the generated Xcode project
@@ -145,4 +145,4 @@ jobs:
           APP_BUNDLE: build/ios-sim/BTDemo.app
           BUNDLE_ID: com.codename1.btle
         run: |
-          ./scripts/ci/run-ios-simulator.sh
+          .github/scripts/run-ios-simulator.sh
