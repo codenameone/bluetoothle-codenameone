@@ -68,7 +68,6 @@
         <module>javase</module>
         <module>win</module>
         <module>lib</module>
-        <module>BTDemo</module>
     </modules>
     <dependencyManagement>
         <dependencies>

@@ -30,6 +30,8 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <kotlin.compiler.jvmTarget>1.8</kotlin.compiler.jvmTarget>
         <cn1app.name>BTDemo</cn1app.name>
+        <exec.mainClass>com.codename1.btle.BTDemoStub</exec.mainClass>
+        <cn1.mainClass>com.codename1.btle.BTDemo</cn1.mainClass>
     </properties>
     <dependencyManagement>
         <dependencies>
