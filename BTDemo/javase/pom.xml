@@ -2,15 +2,15 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-      <groupId>com.codenameone.examples.hellocodenameone</groupId>
-      <artifactId>hellocodenameone</artifactId>
+      <groupId>com.codenameone</groupId>
+      <artifactId>btdemo</artifactId>
       <version>1.0-SNAPSHOT</version>
   </parent>
-  <groupId>com.codenameone.examples.hellocodenameone</groupId>
-  <artifactId>hellocodenameone-javase</artifactId>
+  <groupId>com.codenameone</groupId>
+  <artifactId>btdemo-javase</artifactId>
   <version>1.0-SNAPSHOT</version>
 
-  <name>hellocodenameone-javase</name>
+  <name>btdemo-javase</name>
   
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -81,7 +81,7 @@
           <id>executable-jar</id>
           <properties>
               <codename1.platform>javase</codename1.platform>
-              <exec.mainClass>com.codenameone.examples.hellocodenameone.HelloCodenameOneStub</exec.mainClass>
+              <exec.mainClass>com.codenameone.BtDemoStub</exec.mainClass>
           </properties>
           <dependencies>
               <dependency>
@@ -204,7 +204,7 @@
           <id>run-desktop</id>
           <properties>
               <codename1.platform>javase</codename1.platform>
-              <exec.mainClass>com.codenameone.examples.hellocodenameone.HelloCodenameOneStub</exec.mainClass>
+              <exec.mainClass>com.codenameone.BtDemoStub</exec.mainClass>
           </properties>
           <dependencies>
               <dependency>
