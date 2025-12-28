@@ -22,7 +22,7 @@ jobs:
         mkdir -p ~/.codenameone
         wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
     - name: Build with Maven
-      run: mvn install -DskipTests
+      run: cd cn1-bluetooth && mvn install -DskipTests && cd ..
 
   android:
     runs-on: ubuntu-22.04
@@ -46,27 +46,31 @@ jobs:
           mkdir -p ~/.codenameone
           wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
       - name: Install Libraries (JDK 11)
-        run: mvn install -DskipTests
+        run: cd cn1-bluetooth && mvn install -DskipTests && cd ..
       - name: Enable KVM for Android emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Build BTDemo Source (JDK 17)
+      - name: Install Framebuffer
+        run: sudo apt-get update && sudo apt-get install xvfb
+      - name: Build BTDemo Source (JDK 11)
         env:
           APP_DIR: BTDemo
-          JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
-          .github/scripts/build-thirdparty-app.sh android
+          cd BTDemo
+          xvfb-run -a ./mvnw install
+          xvfb-run -a ./mvnw cn1:build -e -Dcodename1.platform=android -Dcodename1.buildTarget=android-source
+          cd ..
       - name: Compile APK (Gradle)
         env:
           JAVA_HOME: ${{ env.JAVA17_HOME }}
         run: |
           # Locate the Gradle project root
-          GRADLE_ROOT=$(find BTDemo/target -name "gradlew" -type f -exec dirname {} \; | head -n 1)
+          GRADLE_ROOT=$(find BTDemo/android/target -name "gradlew" -type f -exec dirname {} \; | head -n 1)
 
           if [[ -z "$GRADLE_ROOT" ]]; then
-            echo "Error: Gradle project not found in BTDemo/target"
+            echo "Error: Gradle project not found in BTDemo/android/target"
             echo "Listing directories recursively:"
             ls -R .
             exit 1
@@ -110,22 +114,25 @@ jobs:
           mkdir -p ~/.codenameone
           wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
       - name: Install Libraries (JDK 11)
-        run: mvn install -DskipTests
+        run: cd cn1-bluetooth && mvn install -DskipTests && cd ..
       - name: Build BTDemo Source (Maven)
         env:
           APP_DIR: BTDemo
           BUILD_TARGET: ios-source
         run: |
-          .github/scripts/build-thirdparty-app.sh ios
+          cd BTDemo
+          ./mvnw install
+          ./mvnw cn1:build -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+          cd ..
       - name: Compile iOS App (Xcode)
         run: |
           # Find the generated Xcode project
-          XCODE_PROJ=$(find BTDemo/target -name "*.xcodeproj" -type d | head -n 1)
+          XCODE_PROJ=$(find BTDemo/ios/target -name "*.xcodeproj" -type d | head -n 1)
 
           if [[ -z "$XCODE_PROJ" ]]; then
             echo "Error: Xcode project not found in BTDemo/target"
-            echo "Listing BTDemo/target recursively:"
-            ls -R BTDemo/target
+            echo "Listing BTDemo/ios/target recursively:"
+            ls -R BTDemo/ios/target
             exit 1
           fi
 
@@ -136,7 +143,7 @@ jobs:
             -scheme "BTDemo" \
             -configuration Debug \
             -sdk iphonesimulator \
-            -destination "platform=iOS Simulator,name=iPhone 15" \
+            -destination "generic/platform=iOS Simulator" \
             CONFIGURATION_BUILD_DIR=build/ios-sim \
             clean build
 
