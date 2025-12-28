@@ -67,8 +67,8 @@ jobs:
 
           if [[ -z "$GRADLE_ROOT" ]]; then
             echo "Error: Gradle project not found in BTDemo/target"
-            echo "Listing BTDemo/target recursively:"
-            ls -R BTDemo/target
+            echo "Listing directories recursively:"
+            ls -R .
             exit 1
           fi
 

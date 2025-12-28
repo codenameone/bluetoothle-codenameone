@@ -89,7 +89,7 @@ function build_target() {
 
   # Use cn1:build to generate native sources
   "$mvn_cmd" "${mvn_args[@]}" cn1:build
-  popd 
+  popd
 }
 
 build_target
