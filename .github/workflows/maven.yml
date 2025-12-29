@@ -8,9 +8,8 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
     steps:
     - uses: actions/checkout@v2
     - name: Set up JDK 11
@@ -23,4 +22,134 @@ jobs:
         mkdir -p ~/.codenameone
         wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
     - name: Build with Maven
-      run: mvn install
+      run: cd cn1-bluetooth && mvn install -DskipTests && cd ..
+
+  android:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set JAVA17_HOME
+        run: echo "JAVA17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Install Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p ~/.codenameone
+          wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
+      - name: Install Libraries (JDK 11)
+        run: cd cn1-bluetooth && mvn install -DskipTests && cd ..
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install Framebuffer
+        run: sudo apt-get update && sudo apt-get install xvfb
+      - name: Build BTDemo Source (JDK 11)
+        env:
+          APP_DIR: BTDemo
+        run: |
+          cd BTDemo
+          xvfb-run -a ./mvnw install
+          xvfb-run -a ./mvnw cn1:build -e -Dcodename1.platform=android -Dcodename1.buildTarget=android-source
+          cd ..
+      - name: Compile APK (Gradle)
+        env:
+          JAVA_HOME: ${{ env.JAVA17_HOME }}
+        run: |
+          # Locate the Gradle project root
+          GRADLE_ROOT=$(find BTDemo/android/target -name "gradlew" -type f -exec dirname {} \; | head -n 1)
+
+          if [[ -z "$GRADLE_ROOT" ]]; then
+            echo "Error: Gradle project not found in BTDemo/android/target"
+            echo "Listing directories recursively:"
+            ls -R .
+            exit 1
+          fi
+
+          echo "Found Gradle project at: $GRADLE_ROOT"
+          cd "$GRADLE_ROOT"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+          # Move artifact to a predictable location
+          mkdir -p ../../../../build/android
+          find . -name "*.apk" -exec cp {} ../../../../build/android/app-debug.apk \;
+
+      - name: Run Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          arch: x86_64
+          target: google_apis
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb install -r build/android/app-debug.apk
+            adb shell am start -n com.codename1.btle/.BTDemoStub
+            adb logcat -d | tail -n 200
+
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p ~/.codenameone
+          wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
+      - name: Install Libraries (JDK 11)
+        run: cd cn1-bluetooth && mvn install -DskipTests && cd ..
+      - name: Build BTDemo Source (Maven)
+        env:
+          APP_DIR: BTDemo
+          BUILD_TARGET: ios-source
+        run: |
+          cd BTDemo
+          ./mvnw install
+          ./mvnw cn1:build -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+          cd ..
+      - name: Compile iOS App (Xcode)
+        run: |
+          # Find the generated Xcode project
+          XCODE_PROJ=$(find BTDemo/ios/target -name "*.xcodeproj" -type d | head -n 1)
+
+          if [[ -z "$XCODE_PROJ" ]]; then
+            echo "Error: Xcode project not found in BTDemo/target"
+            echo "Listing BTDemo/ios/target recursively:"
+            ls -R BTDemo/ios/target
+            exit 1
+          fi
+
+          echo "Found Xcode project: $XCODE_PROJ"
+
+          # Build the app for the simulator
+          xcodebuild -project "$XCODE_PROJ" \
+            -scheme "BTDemo" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            CONFIGURATION_BUILD_DIR=build/ios-sim \
+            clean build
+
+      - name: Boot simulator, install, and launch
+        env:
+          APP_BUNDLE: build/ios-sim/BTDemo.app
+          BUNDLE_ID: com.codename1.btle
+        run: |
+          .github/scripts/run-ios-simulator.sh
