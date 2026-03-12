@@ -1,7 +1,7 @@
 package com.codename1.bluetoothle;
 
 import com.codename1.cordova.CallbackContext;
-import ca.weblite.codename1.json.JSONArray;
+import org.json.JSONArray;
 import android.bluetooth.BluetoothDevice;
 
 public class Operation {

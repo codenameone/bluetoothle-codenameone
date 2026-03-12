@@ -93,8 +93,11 @@ TEST_DIR="$ANDROID_SRC/app/src/androidTest/java/com/codename1/btle"
 TEST_FILE="$TEST_DIR/BluetoothNativeInstrumentationTest.java"
 CORDOVA_STUB="$ANDROID_SRC/app/src/main/java/com/codename1/cordova/CordovaNativeStub.java"
 CORDOVA_IMPL="$ANDROID_SRC/app/src/main/java/com/codename1/cordova/CordovaNativeImpl.java"
+LEGACY_JSON_UTILS_DIR="$ANDROID_SRC/app/src/main/java/com/codename1/util"
 
 mkdir -p "$TEST_DIR"
+
+rm -f "$LEGACY_JSON_UTILS_DIR/JSONParserUtils.java" "$LEGACY_JSON_UTILS_DIR/JSONUtils.java"
 
 if [[ -f "$CORDOVA_STUB" ]] && [[ ! -f "$CORDOVA_IMPL" ]]; then
   cat > "$CORDOVA_STUB" <<'STUBEOF'

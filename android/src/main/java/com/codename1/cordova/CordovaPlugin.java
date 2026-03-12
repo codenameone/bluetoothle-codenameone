@@ -6,7 +6,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import ca.weblite.codename1.json.*;
+import org.json.*;
 import com.codename1.impl.android.IntentResultListener;
 import com.codename1.impl.android.LifecycleListener;
 

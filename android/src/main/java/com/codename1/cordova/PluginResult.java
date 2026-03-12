@@ -2,7 +2,7 @@ package com.codename1.cordova;
 
 import java.util.List;
 
-import ca.weblite.codename1.json.*;
+import org.json.*;
 import com.codename1.util.Base64;
 
 public class PluginResult {

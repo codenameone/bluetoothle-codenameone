@@ -46,9 +46,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import ca.weblite.codename1.json.JSONArray;
-import ca.weblite.codename1.json.JSONException;
-import ca.weblite.codename1.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import android.util.Log;
 
@@ -62,6 +62,11 @@ public class BluetoothLePlugin extends CordovaPlugin {
   private final int REQUEST_BLUETOOTH_SCAN = 59630;
   private final int REQUEST_BLUETOOTH_ADVERTISE = 59631;
   private final int REQUEST_BLUETOOTH_CONNECT = 59632;
+  // Use literal API level / permission strings so this source compiles with older compileSdk values.
+  private static final int ANDROID_12_API = 31;
+  private static final String PERMISSION_BLUETOOTH_SCAN = "android.permission.BLUETOOTH_SCAN";
+  private static final String PERMISSION_BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT";
+  private static final String PERMISSION_BLUETOOTH_ADVERTISE = "android.permission.BLUETOOTH_ADVERTISE";
   private BluetoothAdapter bluetoothAdapter;
   private boolean isReceiverRegistered = false;
   private boolean isBondReceiverRegistered = false;
@@ -926,7 +931,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
   public void hasPermissionBtScanAction(CallbackContext callbackContext) {
     JSONObject returnObj = new JSONObject();
 
-    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < Build.VERSION_CODES.S || cordova.hasPermission(Manifest.permission.BLUETOOTH_SCAN));
+    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || cordova.hasPermission(PERMISSION_BLUETOOTH_SCAN));
 
     callbackContext.success(returnObj);
   }
@@ -941,7 +946,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     }
 
     permissionsCallback = callbackContext;
-    cordova.requestPermission(this, REQUEST_BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_SCAN);
+    cordova.requestPermission(this, REQUEST_BLUETOOTH_SCAN, PERMISSION_BLUETOOTH_SCAN);
   }
 
   /**
@@ -951,7 +956,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
    public void hasPermissionBtConnectAction(CallbackContext callbackContext) {
     JSONObject returnObj = new JSONObject();
 
-    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < Build.VERSION_CODES.S || cordova.hasPermission(Manifest.permission.BLUETOOTH_CONNECT));
+    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || cordova.hasPermission(PERMISSION_BLUETOOTH_CONNECT));
 
     callbackContext.success(returnObj);
   }
@@ -966,7 +971,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     }
 
     permissionsCallback = callbackContext;
-    cordova.requestPermission(this, REQUEST_BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_CONNECT);
+    cordova.requestPermission(this, REQUEST_BLUETOOTH_CONNECT, PERMISSION_BLUETOOTH_CONNECT);
   }
 
   /**
@@ -976,7 +981,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
    public void hasPermissionBtAdvertiseAction(CallbackContext callbackContext) {
     JSONObject returnObj = new JSONObject();
 
-    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < Build.VERSION_CODES.S || cordova.hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE));
+    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || cordova.hasPermission(PERMISSION_BLUETOOTH_ADVERTISE));
     
     callbackContext.success(returnObj);
   }
@@ -991,7 +996,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     }
 
     permissionsCallback = callbackContext;
-    cordova.requestPermission(this, REQUEST_BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_ADVERTISE);
+    cordova.requestPermission(this, REQUEST_BLUETOOTH_ADVERTISE, PERMISSION_BLUETOOTH_ADVERTISE);
   }
 
   public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
@@ -1007,13 +1012,13 @@ public class BluetoothLePlugin extends CordovaPlugin {
         addProperty(returnObj, "requestPermission", cordova.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION));
         break;
       case REQUEST_BLUETOOTH_SCAN:
-        addProperty(returnObj, "requestPermission", cordova.hasPermission(Manifest.permission.BLUETOOTH_SCAN));
+        addProperty(returnObj, "requestPermission", cordova.hasPermission(PERMISSION_BLUETOOTH_SCAN));
         break;
       case REQUEST_BLUETOOTH_CONNECT:
-        addProperty(returnObj, "requestPermission", cordova.hasPermission(Manifest.permission.BLUETOOTH_CONNECT));
+        addProperty(returnObj, "requestPermission", cordova.hasPermission(PERMISSION_BLUETOOTH_CONNECT));
         break;
       case REQUEST_BLUETOOTH_ADVERTISE:
-        addProperty(returnObj, "requestPermission", cordova.hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE));
+        addProperty(returnObj, "requestPermission", cordova.hasPermission(PERMISSION_BLUETOOTH_ADVERTISE));
         break;
       default:
         addProperty(returnObj, keyError, "requestPermission");
