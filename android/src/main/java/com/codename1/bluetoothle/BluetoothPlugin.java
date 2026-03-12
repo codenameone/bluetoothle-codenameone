@@ -1,4 +1,4 @@
-package com.codename1.cordova;
+package com.codename1.bluetoothle;
 
 import com.codename1.impl.android.AndroidNativeUtil;
 
@@ -6,39 +6,37 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import org.json.*;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import com.codename1.impl.android.IntentResultListener;
 import com.codename1.impl.android.LifecycleListener;
 
-/**
- *
- * @author Chen
- */
-public class CordovaPlugin implements LifecycleListener {
+public class BluetoothPlugin implements LifecycleListener {
 
-    protected CordovaPlugin cordova;
+    protected BluetoothPlugin bridge;
 
-    public CordovaPlugin() {
-        cordova = this;
+    public BluetoothPlugin() {
+        bridge = this;
         AndroidNativeUtil.addLifecycleListener(this);
     }
 
     public boolean execute(String action, String jsonArgs) {
         try {
             JSONArray args = new JSONArray();
-            if(jsonArgs != null && jsonArgs.length() > 0){
+            if (jsonArgs != null && jsonArgs.length() > 0) {
                 JSONObject obj = new JSONObject(jsonArgs);
                 args.put(obj);
             }
             CallbackContext ctx = new CallbackContext(action);
-            return execute(action, args, ctx);            
+            return execute(action, args, ctx);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return false;
     }
-    
-    public boolean execute(String action, final JSONArray args, final CallbackContext callbackContext) throws JSONException{
+
+    public boolean execute(String action, final JSONArray args, final CallbackContext callbackContext) throws JSONException {
         return false;
     }
 
@@ -52,10 +50,10 @@ public class CordovaPlugin implements LifecycleListener {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    public void requestPermission(CordovaPlugin ins, int req, String permission) {
+    public void requestPermission(BluetoothPlugin ins, int req, String permission) {
         try {
-            boolean ret = AndroidNativeUtil.checkForPermission(permission, "required for BLE");
-            onRequestPermissionResult(req, null, null);            
+            AndroidNativeUtil.checkForPermission(permission, "required for BLE");
+            onRequestPermissionResult(req, null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -64,13 +62,12 @@ public class CordovaPlugin implements LifecycleListener {
     public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
     }
 
-    public void startActivityForResult(final CordovaPlugin ins, Intent intent, final int req) {
+    public void startActivityForResult(final BluetoothPlugin ins, Intent intent, final int req) {
         AndroidNativeUtil.startActivityForResult(intent, new IntentResultListener() {
 
             @Override
             public void onActivityResult(int requestCode, int resultCode, Intent data) {
                 ins.onActivityResult(req, resultCode, data);
-
             }
         });
     }
@@ -101,5 +98,4 @@ public class CordovaPlugin implements LifecycleListener {
     @Override
     public void onLowMemory() {
     }
-
 }

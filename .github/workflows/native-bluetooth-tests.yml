@@ -24,6 +24,10 @@ jobs:
           curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
             -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
+      - name: Verify Cordova references are removed
+        run: |
+          ! rg -n "com\\.codename1\\.cordova|<Cordova/CDV|Cordova ~>" .
+
       - name: Run iOS native Bluetooth tests
         env:
           JAVA_HOME: ${{ env.JAVA_HOME }}
@@ -62,6 +66,10 @@ jobs:
           mkdir -p "$HOME/.codenameone"
           curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
             -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
+      - name: Verify Cordova references are removed
+        run: |
+          ! rg -n "com\\.codename1\\.cordova|<Cordova/CDV|Cordova ~>" .
 
       - name: Run Android emulator + native Bluetooth tests
         uses: ReactiveCircus/android-emulator-runner@v2
