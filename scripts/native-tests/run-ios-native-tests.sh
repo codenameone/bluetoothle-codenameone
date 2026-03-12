@@ -54,7 +54,7 @@ mkdir -p "$TEST_DIR"
 cat > "$TEST_FILE" <<'TESTEOF'
 #import <XCTest/XCTest.h>
 #import <CoreBluetooth/CoreBluetooth.h>
-#import "com_codename1_cordova_CordovaNativeImpl.h"
+#import <objc/message.h>
 
 @interface BTDemoBluetoothNativeTests : XCTestCase <CBCentralManagerDelegate>
 @property (nonatomic, strong) CBCentralManager *centralManager;
@@ -68,11 +68,22 @@ cat > "$TEST_FILE" <<'TESTEOF'
 }
 
 - (void)testCordovaBridgeDispatchesLibraryActions {
-    com_codename1_cordova_CordovaNativeImpl *cordova = [[com_codename1_cordova_CordovaNativeImpl alloc] init];
-    XCTAssertTrue([cordova isSupported], @"Cordova native bridge should report support.");
-    XCTAssertTrue([cordova execute:@"isInitialized" param1:@""], @"isInitialized should dispatch to BluetoothLePlugin.");
-    XCTAssertTrue([cordova execute:@"isEnabled" param1:@""], @"isEnabled should dispatch to BluetoothLePlugin.");
-    XCTAssertFalse([cordova execute:@"__unknown_action__" param1:@""], @"Unknown actions should not be handled by plugin.");
+    Class cordovaClass = NSClassFromString(@"com_codename1_cordova_CordovaNativeImpl");
+    XCTAssertNotNil(cordovaClass, @"Cordova native bridge class should be linked.");
+    id cordova = [[cordovaClass alloc] init];
+    XCTAssertNotNil(cordova, @"Cordova native bridge instance should be created.");
+
+    BOOL (*isSupportedFn)(id, SEL) = (BOOL (*)(id, SEL))objc_msgSend;
+    BOOL (*executeFn)(id, SEL, NSString *, NSString *) = (BOOL (*)(id, SEL, NSString *, NSString *))objc_msgSend;
+
+    XCTAssertTrue(isSupportedFn(cordova, NSSelectorFromString(@"isSupported")),
+                  @"Cordova native bridge should report support.");
+    XCTAssertTrue(executeFn(cordova, NSSelectorFromString(@"execute:param1:"), @"isInitialized", @""),
+                  @"isInitialized should dispatch to BluetoothLePlugin.");
+    XCTAssertTrue(executeFn(cordova, NSSelectorFromString(@"execute:param1:"), @"isEnabled", @""),
+                  @"isEnabled should dispatch to BluetoothLePlugin.");
+    XCTAssertFalse(executeFn(cordova, NSSelectorFromString(@"execute:param1:"), @"__unknown_action__", @""),
+                   @"Unknown actions should not be handled by plugin.");
 }
 
 - (void)testCoreBluetoothInitializes {
