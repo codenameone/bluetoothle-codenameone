@@ -4,3 +4,5 @@ target/
 *.iml
 .DS_Store
 common/target/
+BTDemo/androidCerts/
+common/src/main/build/

@@ -12,16 +12,15 @@
     <packaging>jar</packaging>
 
     <name>BTDemo</name>
+    
+    <properties>
+        <codename1.projectPlatform>${codename1.platform}</codename1.projectPlatform>
+    </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>${cn1.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-javase</artifactId>
             <version>${cn1.version}</version>
         </dependency>
         <dependency>
@@ -38,9 +37,6 @@
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-maven-plugin</artifactId>
                 <version>${cn1.plugin.version}</version>
-                <configuration>
-                    <mainClassName>com.codename1.btle.BTDemo</mainClassName>
-                </configuration>
                 <executions>
                     <execution>
                         <goals>
