@@ -54,6 +54,7 @@ mkdir -p "$TEST_DIR"
 cat > "$TEST_FILE" <<'TESTEOF'
 #import <XCTest/XCTest.h>
 #import <CoreBluetooth/CoreBluetooth.h>
+#import "com_codename1_cordova_CordovaNativeImpl.h"
 
 @interface BTDemoBluetoothNativeTests : XCTestCase <CBCentralManagerDelegate>
 @property (nonatomic, strong) CBCentralManager *centralManager;
@@ -64,6 +65,14 @@ cat > "$TEST_FILE" <<'TESTEOF'
 
 - (void)testBluetoothPluginClassIsLinked {
     XCTAssertNotNil(NSClassFromString(@"BluetoothLePlugin"), @"BluetoothLePlugin class was not linked into the host app target.");
+}
+
+- (void)testCordovaBridgeDispatchesLibraryActions {
+    com_codename1_cordova_CordovaNativeImpl *cordova = [[com_codename1_cordova_CordovaNativeImpl alloc] init];
+    XCTAssertTrue([cordova isSupported], @"Cordova native bridge should report support.");
+    XCTAssertTrue([cordova execute:@"isInitialized" param1:@""], @"isInitialized should dispatch to BluetoothLePlugin.");
+    XCTAssertTrue([cordova execute:@"isEnabled" param1:@""], @"isEnabled should dispatch to BluetoothLePlugin.");
+    XCTAssertFalse([cordova execute:@"__unknown_action__" param1:@""], @"Unknown actions should not be handled by plugin.");
 }
 
 - (void)testCoreBluetoothInitializes {

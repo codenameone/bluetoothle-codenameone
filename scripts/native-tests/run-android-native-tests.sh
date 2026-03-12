@@ -122,17 +122,24 @@ package com.codename1.btle;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 
+import com.codename1.cordova.CordovaCallback;
+import com.codename1.cordova.CordovaCallbackManager;
+import com.codename1.cordova.CordovaNativeImpl;
+
 import android.support.test.InstrumentationRegistry;
 import android.support.test.runner.AndroidJUnit4;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import java.util.Map;
 
 @RunWith(AndroidJUnit4.class)
 public class BluetoothNativeInstrumentationTest {
@@ -151,6 +158,28 @@ public class BluetoothNativeInstrumentationTest {
 
         BluetoothAdapter adapter = manager.getAdapter();
         assertNotNull("BluetoothAdapter should be available", adapter);
+    }
+
+    @Test
+    public void cordovaBridgeInvokesLibraryActions() {
+        CordovaNativeImpl impl = new CordovaNativeImpl();
+        assertTrue("Cordova native bridge should report support", impl.isSupported());
+
+        CordovaCallback initializedCb = new CordovaCallback();
+        CordovaCallbackManager.setMethodCallback("isInitialized", initializedCb);
+        assertTrue("isInitialized action should be handled", impl.execute("isInitialized", ""));
+        Map initialized = initializedCb.getResponseAndWait(5000);
+        assertNotNull("isInitialized should produce callback payload", initialized);
+        assertTrue("Payload should include isInitialized", initialized.containsKey("isInitialized"));
+
+        CordovaCallback enabledCb = new CordovaCallback();
+        CordovaCallbackManager.setMethodCallback("isEnabled", enabledCb);
+        assertTrue("isEnabled action should be handled", impl.execute("isEnabled", ""));
+        Map enabled = enabledCb.getResponseAndWait(5000);
+        assertNotNull("isEnabled should produce callback payload", enabled);
+        assertTrue("Payload should include isEnabled", enabled.containsKey("isEnabled"));
+
+        assertFalse("Unknown action should not be handled", impl.execute("__unknown_action__", ""));
     }
 }
 TESTEOF
