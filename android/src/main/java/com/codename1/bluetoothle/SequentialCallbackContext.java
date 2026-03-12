@@ -6,7 +6,7 @@ import com.codename1.cordova.CallbackContext;
 import com.codename1.cordova.PluginResult;
 import java.util.ArrayList;
 import java.util.List;
-import ca.weblite.codename1.json.JSONObject;
+import org.json.JSONObject;
 
 public class SequentialCallbackContext {
     private int sequence;

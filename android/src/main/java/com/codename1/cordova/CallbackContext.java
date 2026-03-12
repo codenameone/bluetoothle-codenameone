@@ -1,6 +1,6 @@
 package com.codename1.cordova;
 
-import ca.weblite.codename1.json.*;
+import org.json.*;
 
 /**
  *
