@@ -13,19 +13,28 @@ fi
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
   if [[ "$(uname -s)" == "Darwin" ]] && [[ -x /usr/libexec/java_home ]]; then
-    JAVA_HOME="$(/usr/libexec/java_home -v 1.8)"
-    export JAVA_HOME
+    JAVA_HOME="$(/usr/libexec/java_home -v 11 2>/dev/null || true)"
+    if [[ -z "$JAVA_HOME" ]]; then
+      JAVA_HOME="$(/usr/libexec/java_home -v 17 2>/dev/null || true)"
+    fi
+    if [[ -n "$JAVA_HOME" ]]; then
+      export JAVA_HOME
+    fi
   fi
 fi
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
-  echo "JAVA_HOME must point to Java 8 for Codename One native source generation." >&2
+  echo "JAVA_HOME must point to Java 11+ for Codename One native source generation." >&2
   exit 1
 fi
 
 export PATH="$JAVA_HOME/bin:$PATH"
 
+mkdir -p BTDemo/target
 find BTDemo/target -maxdepth 1 -type d -name '*-ios-source' -exec rm -rf {} +
+
+# Ensure all platform-specific reactor artifacts are installed locally before CN1 native-source generation.
+mvn -DskipTests -Dcodename1.platform=ios install
 
 mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 

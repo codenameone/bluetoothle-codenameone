@@ -12,7 +12,7 @@ if [[ ! -f "$CN1_BUILD_CLIENT_JAR" ]]; then
 fi
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
-  echo "JAVA_HOME must point to Java 8 for Codename One native source generation." >&2
+  echo "JAVA_HOME must point to Java 11+ for Codename One native source generation." >&2
   exit 1
 fi
 
@@ -26,7 +26,11 @@ export ANDROID_SDK_ROOT
 export ANDROID_HOME="$ANDROID_SDK_ROOT"
 export PATH="$JAVA_HOME/bin:$PATH"
 
+mkdir -p BTDemo/target
 find BTDemo/target -maxdepth 1 -type d -name '*-android-source' -exec rm -rf {} +
+
+# Ensure all platform-specific reactor artifacts are installed locally before CN1 native-source generation.
+mvn -DskipTests -Dcodename1.platform=android install
 
 mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
 
