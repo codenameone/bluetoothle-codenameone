@@ -43,5 +43,6 @@ typedef NS_ENUM(NSInteger, CDVCommandStatus) {
 + (CDVPluginResult*)resultWithStatus:(CDVCommandStatus)status messageAsDictionary:(NSDictionary*)message;
 + (CDVPluginResult*)resultWithStatus:(CDVCommandStatus)status messageAsArray:(NSArray*)message;
 + (CDVPluginResult*)resultWithStatus:(CDVCommandStatus)status messageAsString:(NSString*)message;
+- (void)setKeepCallbackAsBool:(BOOL)b;
 - (NSString*)argumentsAsJSON;
 @end

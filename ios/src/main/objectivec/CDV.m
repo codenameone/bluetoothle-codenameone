@@ -52,6 +52,10 @@
     return [result autorelease];
 }
 
+- (void)setKeepCallbackAsBool:(BOOL)b {
+    self.keepCallback = [NSNumber numberWithBool:b];
+}
+
 - (NSString*)argumentsAsJSON {
     if (self.message == nil) {
         return @"{}";
