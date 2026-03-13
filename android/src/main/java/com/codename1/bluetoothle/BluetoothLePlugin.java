@@ -1,8 +1,8 @@
 package com.codename1.bluetoothle;
 
-import com.codename1.cordova.CallbackContext;
-import com.codename1.cordova.CordovaPlugin;
-import com.codename1.cordova.PluginResult;
+import com.codename1.bluetoothle.CallbackContext;
+import com.codename1.bluetoothle.BluetoothPlugin;
+import com.codename1.bluetoothle.PluginResult;
 
 import android.Manifest;
 
@@ -54,7 +54,7 @@ import android.util.Log;
 
 @SuppressWarnings("unchecked")
 
-public class BluetoothLePlugin extends CordovaPlugin {
+public class BluetoothLePlugin extends BluetoothPlugin {
   //Initialization related variables
   private final int REQUEST_BT_ENABLE = 59627; /*Random integer*/
   private final int REQUEST_ACCESS_FINE_LOCATION = 59628;
@@ -906,7 +906,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
   public void hasPermissionAction(CallbackContext callbackContext) {
     JSONObject returnObj = new JSONObject();
 
-    addProperty(returnObj, "hasPermission", cordova.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION));
+    addProperty(returnObj, "hasPermission", bridge.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION));
 
     callbackContext.success(returnObj);
   }
@@ -921,7 +921,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     }
 
     permissionsCallback = callbackContext;
-    cordova.requestPermission(this, REQUEST_ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION);
+    bridge.requestPermission(this, REQUEST_ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION);
   }
 
   /**
@@ -931,7 +931,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
   public void hasPermissionBtScanAction(CallbackContext callbackContext) {
     JSONObject returnObj = new JSONObject();
 
-    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || cordova.hasPermission(PERMISSION_BLUETOOTH_SCAN));
+    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || bridge.hasPermission(PERMISSION_BLUETOOTH_SCAN));
 
     callbackContext.success(returnObj);
   }
@@ -946,7 +946,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     }
 
     permissionsCallback = callbackContext;
-    cordova.requestPermission(this, REQUEST_BLUETOOTH_SCAN, PERMISSION_BLUETOOTH_SCAN);
+    bridge.requestPermission(this, REQUEST_BLUETOOTH_SCAN, PERMISSION_BLUETOOTH_SCAN);
   }
 
   /**
@@ -956,7 +956,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
    public void hasPermissionBtConnectAction(CallbackContext callbackContext) {
     JSONObject returnObj = new JSONObject();
 
-    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || cordova.hasPermission(PERMISSION_BLUETOOTH_CONNECT));
+    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || bridge.hasPermission(PERMISSION_BLUETOOTH_CONNECT));
 
     callbackContext.success(returnObj);
   }
@@ -971,7 +971,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     }
 
     permissionsCallback = callbackContext;
-    cordova.requestPermission(this, REQUEST_BLUETOOTH_CONNECT, PERMISSION_BLUETOOTH_CONNECT);
+    bridge.requestPermission(this, REQUEST_BLUETOOTH_CONNECT, PERMISSION_BLUETOOTH_CONNECT);
   }
 
   /**
@@ -981,7 +981,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
    public void hasPermissionBtAdvertiseAction(CallbackContext callbackContext) {
     JSONObject returnObj = new JSONObject();
 
-    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || cordova.hasPermission(PERMISSION_BLUETOOTH_ADVERTISE));
+    addProperty(returnObj, "hasPermission", Build.VERSION.SDK_INT < ANDROID_12_API || bridge.hasPermission(PERMISSION_BLUETOOTH_ADVERTISE));
     
     callbackContext.success(returnObj);
   }
@@ -996,7 +996,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     }
 
     permissionsCallback = callbackContext;
-    cordova.requestPermission(this, REQUEST_BLUETOOTH_ADVERTISE, PERMISSION_BLUETOOTH_ADVERTISE);
+    bridge.requestPermission(this, REQUEST_BLUETOOTH_ADVERTISE, PERMISSION_BLUETOOTH_ADVERTISE);
   }
 
   public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
@@ -1009,16 +1009,16 @@ public class BluetoothLePlugin extends CordovaPlugin {
 
     switch (requestCode) {
       case REQUEST_ACCESS_FINE_LOCATION:
-        addProperty(returnObj, "requestPermission", cordova.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION));
+        addProperty(returnObj, "requestPermission", bridge.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION));
         break;
       case REQUEST_BLUETOOTH_SCAN:
-        addProperty(returnObj, "requestPermission", cordova.hasPermission(PERMISSION_BLUETOOTH_SCAN));
+        addProperty(returnObj, "requestPermission", bridge.hasPermission(PERMISSION_BLUETOOTH_SCAN));
         break;
       case REQUEST_BLUETOOTH_CONNECT:
-        addProperty(returnObj, "requestPermission", cordova.hasPermission(PERMISSION_BLUETOOTH_CONNECT));
+        addProperty(returnObj, "requestPermission", bridge.hasPermission(PERMISSION_BLUETOOTH_CONNECT));
         break;
       case REQUEST_BLUETOOTH_ADVERTISE:
-        addProperty(returnObj, "requestPermission", cordova.hasPermission(PERMISSION_BLUETOOTH_ADVERTISE));
+        addProperty(returnObj, "requestPermission", bridge.hasPermission(PERMISSION_BLUETOOTH_ADVERTISE));
         break;
       default:
         addProperty(returnObj, keyError, "requestPermission");
@@ -1044,7 +1044,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     //Only applies to Android 6.0, which requires the users to have location services enabled to scan for devices
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       try {
-        result = (Settings.Secure.getInt(cordova.getActivity().getContentResolver(), Settings.Secure.LOCATION_MODE) != Settings.Secure.LOCATION_MODE_OFF);
+        result = (Settings.Secure.getInt(bridge.getActivity().getContentResolver(), Settings.Secure.LOCATION_MODE) != Settings.Secure.LOCATION_MODE_OFF);
       } catch (Settings.SettingNotFoundException e) {
         result = true; //Probably better to default to true
       }
@@ -1057,7 +1057,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     locationCallback = callbackContext;
 
     Intent intent = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-    cordova.startActivityForResult(this, intent, REQUEST_LOCATION_SOURCE_SETTINGS);
+    bridge.startActivityForResult(this, intent, REQUEST_LOCATION_SOURCE_SETTINGS);
   }
 
   private void initializeAction(JSONArray args, CallbackContext callbackContext) {
@@ -1086,7 +1086,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
       return;
     }
 
-    Activity activity = cordova.getActivity();
+    Activity activity = bridge.getActivity();
 
     JSONObject obj = getArgsObject(args);
 
@@ -1122,7 +1122,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
     if (request) {
       //Request Bluetooth to be enabled
       Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-      cordova.startActivityForResult(this, enableBtIntent, REQUEST_BT_ENABLE);
+      bridge.startActivityForResult(this, enableBtIntent, REQUEST_BT_ENABLE);
     } else {
       //No request, so send back not enabled
       addProperty(returnObj, keyStatus, statusDisabled);
@@ -1143,7 +1143,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
 
     // Not yet initialized
     if (bluetoothAdapter == null) {
-      Activity activity = cordova.getActivity();
+      Activity activity = bridge.getActivity();
       BluetoothManager bluetoothManager = (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
       BluetoothAdapter bluetoothAdapterTmp = bluetoothManager.getAdapter();
 
@@ -1403,7 +1403,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
 
   private void bondAction(JSONArray args, CallbackContext callbackContext) {
     if (!isBondReceiverRegistered) {
-      cordova.getActivity().registerReceiver(mBondReceiver, new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED));
+      bridge.getActivity().registerReceiver(mBondReceiver, new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED));
       isBondReceiverRegistered = true;
     }
 
@@ -1478,7 +1478,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
 
   private void unbondAction(JSONArray args, CallbackContext callbackContext) {
     if (!isBondReceiverRegistered) {
-      cordova.getActivity().registerReceiver(mBondReceiver, new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED));
+      bridge.getActivity().registerReceiver(mBondReceiver, new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED));
       isBondReceiverRegistered = true;
     }
 
@@ -1604,9 +1604,9 @@ public class BluetoothLePlugin extends CordovaPlugin {
     BluetoothGatt bluetoothGatt = null;
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
       int transportMode = getTransportMode(obj);
-      bluetoothGatt = device.connectGatt(cordova.getActivity().getApplicationContext(), autoConnect, bluetoothGattCallback, transportMode);
+      bluetoothGatt = device.connectGatt(bridge.getActivity().getApplicationContext(), autoConnect, bluetoothGattCallback, transportMode);
     } else {
-      bluetoothGatt = device.connectGatt(cordova.getActivity().getApplicationContext(), autoConnect, bluetoothGattCallback);
+      bluetoothGatt = device.connectGatt(bridge.getActivity().getApplicationContext(), autoConnect, bluetoothGattCallback);
     }
 
     connection.put(keyPeripheral, bluetoothGatt);
@@ -2860,7 +2860,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
   private void setPinAction(JSONArray args, CallbackContext callbackContext) {
     Log.d("BLE","set pin");
     if (mPairingRequestReceiver!=null) {
-      cordova.getActivity().unregisterReceiver(mPairingRequestReceiver);
+      bridge.getActivity().unregisterReceiver(mPairingRequestReceiver);
     }
 
     if (isNotInitialized(callbackContext, true)) {
@@ -2904,7 +2904,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
       };
       IntentFilter intentFilter = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
       intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
-      cordova.getActivity().registerReceiver(mPairingRequestReceiver, intentFilter);
+      bridge.getActivity().registerReceiver(mPairingRequestReceiver, intentFilter);
       addProperty(returnObj, keyStatus, "pinSet");
       callbackContext.success(returnObj);
     } catch (Exception e) {
@@ -2922,13 +2922,13 @@ public class BluetoothLePlugin extends CordovaPlugin {
     super.onDestroy();
 
     if (isReceiverRegistered) {
-      cordova.getActivity().unregisterReceiver(mReceiver);
+      bridge.getActivity().unregisterReceiver(mReceiver);
     }
     if (isBondReceiverRegistered) {
-      cordova.getActivity().unregisterReceiver(mBondReceiver);
+      bridge.getActivity().unregisterReceiver(mBondReceiver);
     }
     if(mPairingRequestReceiver!=null){
-      cordova.getActivity().unregisterReceiver(mPairingRequestReceiver);
+      bridge.getActivity().unregisterReceiver(mPairingRequestReceiver);
     }
   }
 
@@ -4838,7 +4838,7 @@ public class BluetoothLePlugin extends CordovaPlugin {
   private void initGattServer() {
     //Re-opening Gatt server seems to cause some issues
     if (gattServer == null) {
-      Activity activity = cordova.getActivity();
+      Activity activity = bridge.getActivity();
       BluetoothManager bluetoothManager = (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
       gattServer = bluetoothManager.openGattServer(activity.getApplicationContext(), bluetoothGattServerCallback);
     }

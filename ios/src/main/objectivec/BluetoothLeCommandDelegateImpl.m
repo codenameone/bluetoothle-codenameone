@@ -21,7 +21,7 @@
 #import "CDVCommandQueue.h"
 #import "CDVPluginResult.h"
 #import "CDVViewController.h"
-#import "com_codename1_cordova_CordovaCallbackManager.h"
+#import "com_codename1_bluetoothle_BluetoothCallbackRegistry.h"
 
 @implementation BluetoothLeCommandDelegateImpl : NSObject
 
@@ -77,11 +77,9 @@
     debug = YES;
 #endif
 
-    //NSString* js = [NSString stringWithFormat:@"cordova.require('cordova/exec').nativeCallback('%@',%d,%@,%d, %d)", callbackId, status, argumentsAsJSON, keepCallback, debug];
-
     //[self evalJsHelper:js];
     NSLog(@"Result %@", argumentsAsJSON);
-    com_codename1_cordova_CordovaCallbackManager_sendResult___java_lang_String_java_lang_String(
+    com_codename1_bluetoothle_BluetoothCallbackRegistry_sendResult___java_lang_String_java_lang_String(
         CN1_THREAD_GET_STATE_PASS_ARG 
         fromNSString(CN1_THREAD_GET_STATE_PASS_ARG callbackId),
         fromNSString(CN1_THREAD_GET_STATE_PASS_ARG argumentsAsJSON)

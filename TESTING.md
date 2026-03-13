@@ -28,13 +28,13 @@ Tests executed:
 1. `testBluetoothPluginClassIsLinked`
 - Verifies Objective-C plugin class `BluetoothLePlugin` is linked into generated app target.
 
-2. `testCordovaBridgeDispatchesLibraryActions`
-- Instantiates `com_codename1_cordova_CordovaNativeImpl`.
-- Calls bridge methods that dispatch into library plugin actions:
-  - `execute("isInitialized", "")`
-  - `execute("isEnabled", "")`
-- Verifies unknown action returns `false`:
-  - `execute("__unknown_action__", "")`
+2. `testNativeBridgeDispatchesLibraryActions`
+- Instantiates `com_codename1_bluetoothle_BluetoothNativeBridgeImpl`.
+- Calls deterministic direct native bridge methods:
+  - `isInitialized()`
+  - `isEnabled()`
+  - `isScanning()`
+- Runs those checks on the main thread to avoid Main Thread Checker violations in iOS CI.
 - This validates dispatch from bridge into `BluetoothLePlugin` action handlers.
 
 3. `testCoreBluetoothInitializes`
@@ -52,17 +52,19 @@ Tests executed:
 - Verifies `BluetoothManager` and `BluetoothAdapter` are available.
 - Verifies device/emulator advertises BLE feature (`FEATURE_BLUETOOTH_LE`).
 
-2. `cordovaBridgeInvokesLibraryActions`
-- Instantiates `com.codename1.cordova.CordovaNativeImpl`.
-- Registers callbacks through `CordovaCallbackManager`.
-- Invokes library actions through bridge:
-  - `execute("isInitialized", "")`
-  - `execute("isEnabled", "")`
+2. `nativeBridgeInvokesLibraryActions`
+- Instantiates `com.codename1.bluetoothle.BluetoothNativeBridgeImpl`.
+- Registers callbacks through `BluetoothCallbackRegistry`.
+- Invokes library actions through direct bridge methods:
+  - `isInitialized()`
+  - `isEnabled()`
+  - `isScanning()`
+- Executes additional operation methods in best-effort mode without asserting `true`, because emulator CI often lacks connected peripheral state.
 - Asserts callback payload contains expected keys:
   - `isInitialized`
   - `isEnabled`
-- Verifies unknown action returns `false`:
-  - `execute("__unknown_action__", "")`
+  - `isScanning`
+- Unknown-action dispatch is no longer exposed in the public/native bridge contract.
 
 This confirms the Android bridge and plugin action routing execute and produce callback payloads.
 

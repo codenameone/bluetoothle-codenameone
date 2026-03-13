@@ -1,7 +1,7 @@
 # bluetoothle-codenameone
 
 Bluethooth LE Library for [Codename One](https://github.com/codenameone/CodenameOne) apps.
-This Library is based on the excellent cordova plugin from https://github.com/randdusing/cordova-plugin-bluetoothle
+This library now uses a native Codename One bridge implementation adapted from the original Bluetooth LE plugin lineage.
 
 ## Integration
 
@@ -9,6 +9,10 @@ This Library is based on the excellent cordova plugin from https://github.com/ra
 2. Place the CN1Bluethooth.cn1lib file in your CN1 project lib.
 3. Add the CN1JSON.cn1lib file in your CN1 project lib. (https://github.com/shannah/CN1JSON/)
 4. Right click on your CN1 project and select "Refresh Libs" then clean build your project.
+
+## API Reference
+
+- See [docs/API.md](docs/API.md) for call-by-call API documentation and behavior notes.
 
 ## Sample of Usage
 
@@ -49,4 +53,4 @@ This Library is based on the excellent cordova plugin from https://github.com/ra
 ## Credits
 
 1. Steve Hannah - for the https://github.com/shannah/CN1JSON
-2. Rand Dusing - for the https://github.com/randdusing/cordova-plugin-bluetoothle
+2. Rand Dusing - for the original bluetoothle plugin lineage

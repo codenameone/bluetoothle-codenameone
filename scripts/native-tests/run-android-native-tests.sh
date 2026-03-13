@@ -91,28 +91,89 @@ perl -0pi -e "s/com\\.android\\.support:support-v4:0\\.\\+/com.android.support:s
 
 TEST_DIR="$ANDROID_SRC/app/src/androidTest/java/com/codename1/btle"
 TEST_FILE="$TEST_DIR/BluetoothNativeInstrumentationTest.java"
-CORDOVA_STUB="$ANDROID_SRC/app/src/main/java/com/codename1/cordova/CordovaNativeStub.java"
-CORDOVA_IMPL="$ANDROID_SRC/app/src/main/java/com/codename1/cordova/CordovaNativeImpl.java"
+BRIDGE_STUB="$ANDROID_SRC/app/src/main/java/com/codename1/bluetoothle/BluetoothNativeBridgeStub.java"
+BRIDGE_IMPL="$ANDROID_SRC/app/src/main/java/com/codename1/bluetoothle/BluetoothNativeBridgeImpl.java"
 LEGACY_JSON_UTILS_DIR="$ANDROID_SRC/app/src/main/java/com/codename1/util"
 
 mkdir -p "$TEST_DIR"
 
 rm -f "$LEGACY_JSON_UTILS_DIR/JSONParserUtils.java" "$LEGACY_JSON_UTILS_DIR/JSONUtils.java"
 
-if [[ -f "$CORDOVA_STUB" ]] && [[ ! -f "$CORDOVA_IMPL" ]]; then
-  cat > "$CORDOVA_STUB" <<'STUBEOF'
-package com.codename1.cordova;
+if [[ -f "$BRIDGE_STUB" ]] && [[ ! -f "$BRIDGE_IMPL" ]]; then
+  cat > "$BRIDGE_STUB" <<'STUBEOF'
+package com.codename1.bluetoothle;
 
-public class CordovaNativeStub implements CordovaNative {
+public class BluetoothNativeBridgeStub implements BluetoothNativeBridge {
     @Override
-    public boolean execute(String param0, String param1) {
-        return false;
-    }
-
+    public boolean initialize(boolean request, boolean statusReceiver, String restoreKey) { return false; }
     @Override
-    public boolean isSupported() {
-        return false;
-    }
+    public boolean enable() { return false; }
+    @Override
+    public boolean disable() { return false; }
+    @Override
+    public boolean startScan(String servicesJson, boolean allowDuplicates, int scanMode, int matchMode, int matchNum, int callbackType) { return false; }
+    @Override
+    public boolean stopScan() { return false; }
+    @Override
+    public boolean retrieveConnected(String servicesJson) { return false; }
+    @Override
+    public boolean connect(String address) { return false; }
+    @Override
+    public boolean reconnect(String address) { return false; }
+    @Override
+    public boolean disconnect(String address) { return false; }
+    @Override
+    public boolean close(String address) { return false; }
+    @Override
+    public boolean discover(String address) { return false; }
+    @Override
+    public boolean services(String address, String servicesJson) { return false; }
+    @Override
+    public boolean characteristics(String address, String service, String characteristicsJson) { return false; }
+    @Override
+    public boolean descriptors(String address, String service, String characteristic) { return false; }
+    @Override
+    public boolean read(String address, String service, String characteristic) { return false; }
+    @Override
+    public boolean subscribe(String address, String service, String characteristic) { return false; }
+    @Override
+    public boolean unsubscribe(String address, String service, String characteristic) { return false; }
+    @Override
+    public boolean write(String address, String service, String characteristic, String value, boolean noResponse) { return false; }
+    @Override
+    public boolean writeQ(String address, String service, String characteristic, String value, boolean noResponse) { return false; }
+    @Override
+    public boolean readDescriptor(String address, String service, String characteristic, String descriptor) { return false; }
+    @Override
+    public boolean writeDescriptor(String address, String service, String characteristic, String descriptor, String value) { return false; }
+    @Override
+    public boolean rssi(String address) { return false; }
+    @Override
+    public boolean mtu(String address, int mtu) { return false; }
+    @Override
+    public boolean requestConnectionPriority(String address, String priority) { return false; }
+    @Override
+    public boolean isInitialized() { return false; }
+    @Override
+    public boolean isEnabled() { return false; }
+    @Override
+    public boolean isScanning() { return false; }
+    @Override
+    public boolean wasConnected(String address) { return false; }
+    @Override
+    public boolean isConnected(String address) { return false; }
+    @Override
+    public boolean isDiscovered(String address) { return false; }
+    @Override
+    public boolean hasPermission() { return false; }
+    @Override
+    public boolean requestPermission() { return false; }
+    @Override
+    public boolean isLocationEnabled() { return false; }
+    @Override
+    public boolean requestLocation() { return false; }
+    @Override
+    public boolean isSupported() { return false; }
 }
 STUBEOF
 fi
@@ -129,9 +190,9 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 
-import com.codename1.cordova.CordovaCallback;
-import com.codename1.cordova.CordovaCallbackManager;
-import com.codename1.cordova.CordovaNativeImpl;
+import com.codename1.bluetoothle.BluetoothCallback;
+import com.codename1.bluetoothle.BluetoothCallbackRegistry;
+import com.codename1.bluetoothle.BluetoothNativeBridgeImpl;
 
 import android.support.test.InstrumentationRegistry;
 import android.support.test.runner.AndroidJUnit4;
@@ -161,25 +222,43 @@ public class BluetoothNativeInstrumentationTest {
     }
 
     @Test
-    public void cordovaBridgeInvokesLibraryActions() {
-        CordovaNativeImpl impl = new CordovaNativeImpl();
-        assertTrue("Cordova native bridge should report support", impl.isSupported());
+    public void nativeBridgeInvokesLibraryActions() {
+        BluetoothNativeBridgeImpl impl = new BluetoothNativeBridgeImpl();
+        assertTrue("Native bridge should report support", impl.isSupported());
 
-        CordovaCallback initializedCb = new CordovaCallback();
-        CordovaCallbackManager.setMethodCallback("isInitialized", initializedCb);
-        assertTrue("isInitialized action should be handled", impl.execute("isInitialized", ""));
+        BluetoothCallback initializedCb = new BluetoothCallback();
+        BluetoothCallbackRegistry.setMethodCallback("isInitialized", initializedCb);
+        assertTrue("isInitialized action should be handled", impl.isInitialized());
         Map initialized = initializedCb.getResponseAndWait(5000);
         assertNotNull("isInitialized should produce callback payload", initialized);
         assertTrue("Payload should include isInitialized", initialized.containsKey("isInitialized"));
 
-        CordovaCallback enabledCb = new CordovaCallback();
-        CordovaCallbackManager.setMethodCallback("isEnabled", enabledCb);
-        assertTrue("isEnabled action should be handled", impl.execute("isEnabled", ""));
+        BluetoothCallback enabledCb = new BluetoothCallback();
+        BluetoothCallbackRegistry.setMethodCallback("isEnabled", enabledCb);
+        assertTrue("isEnabled action should be handled", impl.isEnabled());
         Map enabled = enabledCb.getResponseAndWait(5000);
         assertNotNull("isEnabled should produce callback payload", enabled);
         assertTrue("Payload should include isEnabled", enabled.containsKey("isEnabled"));
 
-        assertFalse("Unknown action should not be handled", impl.execute("__unknown_action__", ""));
+        BluetoothCallback scanningCb = new BluetoothCallback();
+        BluetoothCallbackRegistry.setMethodCallback("isScanning", scanningCb);
+        assertTrue("isScanning action should be handled", impl.isScanning());
+        Map scanning = scanningCb.getResponseAndWait(5000);
+        assertNotNull("isScanning should produce callback payload", scanning);
+        assertTrue("Payload should include isScanning", scanning.containsKey("isScanning"));
+
+        // Best-effort invocations for operation coverage.
+        // These may legitimately return false in emulator CI (no connected BLE peripheral / unmet state).
+        impl.isConnected("00:11:22:33:44:55");
+        impl.isDiscovered("00:11:22:33:44:55");
+        impl.startScan("", false, 0, 1, 1, 1);
+        impl.stopScan();
+        impl.connect("00:11:22:33:44:55");
+        impl.disconnect("00:11:22:33:44:55");
+        impl.read("00:11:22:33:44:55", "180A", "2A29");
+        impl.write("00:11:22:33:44:55", "180A", "2A29", "AA==", false);
+        impl.subscribe("00:11:22:33:44:55", "180A", "2A29");
+        impl.unsubscribe("00:11:22:33:44:55", "180A", "2A29");
     }
 }
 TESTEOF

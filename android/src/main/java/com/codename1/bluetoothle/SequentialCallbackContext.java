@@ -1,9 +1,9 @@
-// Inspiration taken from cordova-plugin-ble-central
+
 
 package com.codename1.bluetoothle;
 
-import com.codename1.cordova.CallbackContext;
-import com.codename1.cordova.PluginResult;
+import com.codename1.bluetoothle.CallbackContext;
+import com.codename1.bluetoothle.PluginResult;
 import java.util.ArrayList;
 import java.util.List;
 import org.json.JSONObject;

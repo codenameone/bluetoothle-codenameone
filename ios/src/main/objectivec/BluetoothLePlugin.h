@@ -1,4 +1,4 @@
-#import <Cordova/CDV.h>
+#import "CDV.h"
 #import <CoreBluetooth/CoreBluetooth.h>
 
 @interface BluetoothLePlugin : CDVPlugin <CBCentralManagerDelegate, CBPeripheralDelegate, CBPeripheralManagerDelegate> {

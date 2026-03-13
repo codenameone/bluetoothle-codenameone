@@ -1,6 +1,6 @@
 package com.codename1.bluetoothle;
 
-import com.codename1.cordova.CallbackContext;
+import com.codename1.bluetoothle.CallbackContext;
 import org.json.JSONArray;
 import android.bluetooth.BluetoothDevice;
 
