@@ -21,9 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Decode GPG private key
+      - name: Materialize GPG private key
         run: |
-          echo "$MAVEN_GPG_PRIVATE_KEY" | base64 --decode > /tmp/maven-signing-key.asc
+          if printf '%s' "$MAVEN_GPG_PRIVATE_KEY" | grep -q 'BEGIN PGP PRIVATE KEY BLOCK'; then
+            printf '%s' "$MAVEN_GPG_PRIVATE_KEY" > /tmp/maven-signing-key.asc
+          else
+            printf '%s' "$MAVEN_GPG_PRIVATE_KEY" | tr -d '\r\n\t ' | base64 --decode > /tmp/maven-signing-key.asc
+          fi
         env:
           MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
 
