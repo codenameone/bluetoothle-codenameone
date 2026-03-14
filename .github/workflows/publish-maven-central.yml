@@ -1,0 +1,59 @@
+name: Publish Maven Central
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'codenameone/bluetoothle-codenameone'
+    runs-on: ubuntu-latest
+
+    env:
+      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+      MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+      MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decode GPG private key
+        run: |
+          echo "$MAVEN_GPG_PRIVATE_KEY" | base64 --decode > /tmp/maven-signing-key.asc
+        env:
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+
+      - name: Import GPG private key
+        run: gpg --batch --import /tmp/maven-signing-key.asc
+
+      - name: Set up Java 11 and Maven server credentials
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+          server-id: nexus-staging
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p "$HOME/.codenameone"
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
+      - name: Verify version is a release version
+        run: |
+          VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          echo "Project version: $VERSION"
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            echo "Publishing to Maven Central requires a non-SNAPSHOT version."
+            exit 1
+          fi
+
+      - name: Deploy to Sonatype / Maven Central
+        run: mvn -B -Psign-artifacts -Dgpg.passphrase="$MAVEN_GPG_PASSPHRASE" -pl common,android,ios,javascript,javase,win,lib -am -DskipTests deploy

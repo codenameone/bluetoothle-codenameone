@@ -20,29 +20,20 @@
         </license>
     </licenses>
 
-    <!-- UNCOMMENT AND COMPLETE THIS SECTION IF PUBLISHING TO MAVEN CENTRAL -->
-    <!--
     <developers>
         <developer>
-            <id>exampleId</id>
-            <name>FirstName LastName</name>
-            <email>yourname@example.com</email>
-            <timezone>-8</timezone>
+            <id>codenameone</id>
+            <name>Codename One</name>
+            <url>https://github.com/codenameone</url>
         </developer>
-
     </developers>
 
-    -->
-    <!-- UNCOMMENT AND COMPLETE THIS SECTION IF PUBLISHING TO MAVEN CENTRAL
-        ME => Your Github Username
-        MYREPO => Your github repository name.
-    -->
-    <!--
     <scm>
-        <url>https://github.com/ME/MYREPO</url>
-        <connection>scm:git:git@github.com:ME/MYREPO.git</connection>
+        <url>https://github.com/codenameone/bluetoothle-codenameone</url>
+        <connection>scm:git:https://github.com/codenameone/bluetoothle-codenameone.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/codenameone/bluetoothle-codenameone.git</developerConnection>
+        <tag>HEAD</tag>
     </scm>
-    -->
 
 
     <properties>
@@ -59,6 +50,8 @@
         <kotlin.version>1.3.72</kotlin.version>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
         <kotlin.compiler.jvmTarget>1.8</kotlin.compiler.jvmTarget>
+        <nexus.server.id>nexus-staging</nexus.server.id>
+        <nexus.url>https://s01.oss.sonatype.org</nexus.url>
     </properties>
     <modules>
         <module>common</module>
@@ -219,6 +212,17 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>1.7.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>${nexus.server.id}</serverId>
+                    <nexusUrl>${nexus.url}</nexusUrl>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -253,7 +257,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.4</version>
+                        <version>3.2.4</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
@@ -263,6 +267,10 @@
                                 </goals>
                                 <configuration>
                                     <passphrase>${gpg.passphrase}</passphrase>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
                                 </configuration>
                             </execution>
                         </executions>
@@ -273,10 +281,15 @@
     </profiles>
     <distributionManagement>
         <repository>
-            <id>nexus-staging</id>
+            <id>${nexus.server.id}</id>
             <name>Nexus Release Repository</name>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+            <url>${nexus.url}/service/local/staging/deploy/maven2/</url>
         </repository>
+        <snapshotRepository>
+            <id>${nexus.server.id}</id>
+            <name>Nexus Snapshot Repository</name>
+            <url>${nexus.url}/content/repositories/snapshots</url>
+        </snapshotRepository>
     </distributionManagement>
     <repositories>
         <repository>
@@ -291,7 +304,7 @@
         <repository>
             <id>sonatype-snapshots</id>
             <name>Sonatype Snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <url>${nexus.url}/content/repositories/snapshots</url>
             <snapshots>
                 <enabled>true</enabled>
             </snapshots>
@@ -299,7 +312,7 @@
         <repository>
             <id>sonatype-staging</id>
             <name>Sonatype Staging</name>
-            <url>https://oss.sonatype.org/content/repositories/staging</url>
+            <url>${nexus.url}/content/repositories/staging</url>
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
