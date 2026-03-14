@@ -25,7 +25,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve project version
+        id: project_version
+        run: |
+          VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Materialize GPG private key
+        if: steps.project_version.outputs.publish == 'true'
         run: |
           rm -f /tmp/maven-signing-key.asc
           printf '%s' "$MAVEN_GPG_PRIVATE_KEY" > /tmp/maven-signing-key.raw
@@ -51,29 +63,28 @@ jobs:
           MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
 
       - name: Set up Java 11 and Maven server credentials
+        if: steps.project_version.outputs.publish == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
           cache: maven
-          server-id: nexus-staging
+          server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
 
       - name: Setup Codename One Build Client
+        if: steps.project_version.outputs.publish == 'true'
         run: |
           mkdir -p "$HOME/.codenameone"
           curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
             -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
-      - name: Verify version is a release version
+      - name: Skip snapshot publish
+        if: steps.project_version.outputs.publish != 'true'
         run: |
-          VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
-          echo "Project version: $VERSION"
-          if [[ "$VERSION" == *-SNAPSHOT ]]; then
-            echo "Publishing to Maven Central requires a non-SNAPSHOT version."
-            exit 1
-          fi
+          echo "Project version ${{ steps.project_version.outputs.version }} is a snapshot. Skipping Maven Central publish."
 
       - name: Deploy to Sonatype / Maven Central
+        if: steps.project_version.outputs.publish == 'true'
         run: mvn -B -Psign-artifacts -Dgpg.passphrase="$MAVEN_GPG_PASSPHRASE" -pl common,android,ios,javascript,javase,win,lib -am -DskipTests deploy

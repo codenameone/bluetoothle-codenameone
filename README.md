@@ -13,16 +13,14 @@ Add the library dependency to your project `pom.xml`:
 
 ```xml
 <dependency>
-    <groupId>com.codename1</groupId>
+    <groupId>com.codenameone</groupId>
     <artifactId>cn1-bluetooth-lib</artifactId>
-    <version>LATEST_RELEASE_VERSION</version>
+    <version>1.0.0</version>
     <type>pom</type>
 </dependency>
 ```
 
-As of 2026-03-14, this artifact is not yet listed on Maven Central, so replace `LATEST_RELEASE_VERSION`
-with the first published release once it is available. This is the same dependency form used by the sample
-app in [BTDemo/pom.xml](BTDemo/pom.xml).
+This is the same dependency form used by the sample app in [BTDemo/pom.xml](BTDemo/pom.xml).
 
 ### Classic Codename One project using `.cn1lib`
 
