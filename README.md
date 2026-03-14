@@ -5,10 +5,33 @@ This library now uses a native Codename One bridge implementation adapted from t
 
 ## Integration
 
-1. Build the project
-2. Place the CN1Bluethooth.cn1lib file in your CN1 project lib.
-3. Add the CN1JSON.cn1lib file in your CN1 project lib. (https://github.com/shannah/CN1JSON/)
-4. Right click on your CN1 project and select "Refresh Libs" then clean build your project.
+This library can be added to a Codename One project in either of these ways.
+
+### Maven-based Codename One project
+
+Add the library dependency to your project `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>com.codename1</groupId>
+    <artifactId>cn1-bluetooth-lib</artifactId>
+    <version>LATEST_RELEASE_VERSION</version>
+    <type>pom</type>
+</dependency>
+```
+
+As of 2026-03-14, this artifact is not yet listed on Maven Central, so replace `LATEST_RELEASE_VERSION`
+with the first published release once it is available. This is the same dependency form used by the sample
+app in [BTDemo/pom.xml](BTDemo/pom.xml).
+
+### Classic Codename One project using `.cn1lib`
+
+1. Build or download the `.cn1lib` artifact for this library.
+2. Add the `.cn1lib` file into your project's `lib/` directory.
+3. In the Codename One project, run `Refresh Libs`.
+4. Clean and rebuild the project.
+
+The library requires Java 8, as declared in [common/codenameone_library_required.properties](common/codenameone_library_required.properties).
 
 ## API Reference
 

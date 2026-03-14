@@ -3,6 +3,10 @@ name: Publish Maven Central
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
@@ -23,16 +27,28 @@ jobs:
 
       - name: Materialize GPG private key
         run: |
-          if printf '%s' "$MAVEN_GPG_PRIVATE_KEY" | grep -q 'BEGIN PGP PRIVATE KEY BLOCK'; then
-            printf '%s' "$MAVEN_GPG_PRIVATE_KEY" > /tmp/maven-signing-key.asc
-          else
-            printf '%s' "$MAVEN_GPG_PRIVATE_KEY" | tr -d '\r\n\t ' | base64 --decode > /tmp/maven-signing-key.asc
+          rm -f /tmp/maven-signing-key.asc
+          printf '%s' "$MAVEN_GPG_PRIVATE_KEY" > /tmp/maven-signing-key.raw
+
+          if gpg --batch --import /tmp/maven-signing-key.raw >/tmp/gpg-import.log 2>&1; then
+            cp /tmp/maven-signing-key.raw /tmp/maven-signing-key.asc
+            exit 0
           fi
+
+          if printf '%s' "$MAVEN_GPG_PRIVATE_KEY" | tr -d '\r\n\t ' | base64 --decode --ignore-garbage > /tmp/maven-signing-key.asc 2>/tmp/base64-decode.log; then
+            if gpg --batch --import /tmp/maven-signing-key.asc >/tmp/gpg-import.log 2>&1; then
+              exit 0
+            fi
+          fi
+
+          echo "Unable to import MAVEN_GPG_PRIVATE_KEY as raw armored/binary data or as base64-encoded key material."
+          echo "gpg import output:"
+          sed -n '1,40p' /tmp/gpg-import.log || true
+          echo "base64 decode output:"
+          sed -n '1,40p' /tmp/base64-decode.log || true
+          exit 1
         env:
           MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
-
-      - name: Import GPG private key
-        run: gpg --batch --import /tmp/maven-signing-key.asc
 
       - name: Set up Java 11 and Maven server credentials
         uses: actions/setup-java@v4
