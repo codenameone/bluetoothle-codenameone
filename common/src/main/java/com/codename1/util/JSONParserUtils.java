@@ -5,7 +5,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.util.Map;
-import java.util.List;
 
 public class JSONParserUtils {
     public static Map<String, Object> parse(String json) throws IOException {
