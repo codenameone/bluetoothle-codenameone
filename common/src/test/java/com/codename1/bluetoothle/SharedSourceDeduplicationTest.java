@@ -1,4 +1,4 @@
-package com.codename1.util;
+package com.codename1.bluetoothle;
 
 import java.io.IOException;
 import java.nio.file.Files;
