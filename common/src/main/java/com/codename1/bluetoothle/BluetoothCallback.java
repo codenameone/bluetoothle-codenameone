@@ -5,8 +5,10 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.util.AsyncResource;
-import com.codename1.util.JSONParserUtils;
+import com.codename1.io.JSONParser;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Map;
 
 public class BluetoothCallback {
@@ -25,9 +27,14 @@ public class BluetoothCallback {
         this.listener = listener;
     }
 
+    private Map<String, Object> parseJson(String json) throws IOException {
+        JSONParser p = new JSONParser();
+        return p.parseJSON(new InputStreamReader(new ByteArrayInputStream(json.getBytes("UTF-8")), "UTF-8"));
+    }
+
     public void onError(String jsonStr) {
         try {
-            onError(JSONParserUtils.parse(jsonStr));
+            onError(parseJson(jsonStr));
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -46,7 +53,7 @@ public class BluetoothCallback {
 
     public void onSuccess(String jsonStr) {
         try {
-            onSuccess(JSONParserUtils.parse(jsonStr));
+            onSuccess(parseJson(jsonStr));
         } catch (IOException ex) {
             ex.printStackTrace();
         }

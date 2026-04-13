@@ -81,10 +81,6 @@ ensure_gradle_property() {
 
 GRADLE_PROPERTIES="$ANDROID_SRC/gradle.properties"
 APP_GRADLE_PROPERTIES="$ANDROID_SRC/app/gradle.properties"
-ensure_gradle_property "$GRADLE_PROPERTIES" "android.useAndroidX" "false"
-ensure_gradle_property "$GRADLE_PROPERTIES" "android.enableJetifier" "false"
-ensure_gradle_property "$APP_GRADLE_PROPERTIES" "android.useAndroidX" "false"
-ensure_gradle_property "$APP_GRADLE_PROPERTIES" "android.enableJetifier" "false"
 
 perl -0pi -e "s/compileSdkVersion\\s+0/compileSdkVersion 30/g; s/targetSdkVersion\\s+0/targetSdkVersion 30/g; s/buildToolsVersion\\s+'0'/buildToolsVersion '30.0.3'/g" "$APP_BUILD_GRADLE"
 perl -0pi -e "s/com\\.android\\.support:support-v4:0\\.\\+/com.android.support:support-v4:28.0.0/g; s/com\\.android\\.support:appcompat-v7:0\\.\\+/com.android.support:appcompat-v7:28.0.0/g" "$APP_BUILD_GRADLE"
@@ -295,8 +291,6 @@ if ! rg -q "com\.android\.support\.test:runner" "$APP_BUILD_GRADLE"; then
 
 dependencies {
     $TEST_DEP_CONF "com.android.support.test:runner:1.0.2"
-    $TEST_DEP_CONF "com.android.support.test:rules:1.0.2"
-    $TEST_DEP_CONF "com.android.support.test.espresso:espresso-core:3.0.2"
 }
 EOF
 fi
