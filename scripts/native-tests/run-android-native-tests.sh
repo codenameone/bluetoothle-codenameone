@@ -81,10 +81,10 @@ ensure_gradle_property() {
 
 GRADLE_PROPERTIES="$ANDROID_SRC/gradle.properties"
 APP_GRADLE_PROPERTIES="$ANDROID_SRC/app/gradle.properties"
-ensure_gradle_property "$GRADLE_PROPERTIES" "android.useAndroidX" "false"
-ensure_gradle_property "$GRADLE_PROPERTIES" "android.enableJetifier" "false"
-ensure_gradle_property "$APP_GRADLE_PROPERTIES" "android.useAndroidX" "false"
-ensure_gradle_property "$APP_GRADLE_PROPERTIES" "android.enableJetifier" "false"
+ensure_gradle_property "$GRADLE_PROPERTIES" "android.useAndroidX" "true"
+ensure_gradle_property "$GRADLE_PROPERTIES" "android.enableJetifier" "true"
+ensure_gradle_property "$APP_GRADLE_PROPERTIES" "android.useAndroidX" "true"
+ensure_gradle_property "$APP_GRADLE_PROPERTIES" "android.enableJetifier" "true"
 
 perl -0pi -e "s/compileSdkVersion\\s+0/compileSdkVersion 30/g; s/targetSdkVersion\\s+0/targetSdkVersion 30/g; s/buildToolsVersion\\s+'0'/buildToolsVersion '30.0.3'/g" "$APP_BUILD_GRADLE"
 perl -0pi -e "s/com\\.android\\.support:support-v4:0\\.\\+/com.android.support:support-v4:28.0.0/g; s/com\\.android\\.support:appcompat-v7:0\\.\\+/com.android.support:appcompat-v7:28.0.0/g" "$APP_BUILD_GRADLE"
@@ -194,8 +194,8 @@ import com.codename1.bluetoothle.BluetoothCallback;
 import com.codename1.bluetoothle.BluetoothCallbackRegistry;
 import com.codename1.bluetoothle.BluetoothNativeBridgeImpl;
 
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.AndroidJUnit4;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -268,13 +268,13 @@ if [[ -f "$EXAMPLE_TEST" ]]; then
   rm -f "$EXAMPLE_TEST"
 fi
 
-if ! rg -q 'testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"' "$APP_BUILD_GRADLE"; then
+if ! rg -q 'testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"' "$APP_BUILD_GRADLE"; then
   TMP_GRADLE="$(mktemp)"
   awk '
     {
       print
       if ($0 ~ /^[[:space:]]*defaultConfig[[:space:]]*\{[[:space:]]*$/ && !runnerInserted) {
-        print "        testInstrumentationRunner \"android.support.test.runner.AndroidJUnitRunner\""
+        print "        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\""
         runnerInserted = 1
       }
     }
@@ -290,13 +290,13 @@ fi
 # Remove stale injected test dependency lines from previous runs.
 perl -ni -e 'print unless /(androidx\.test:(runner|ext:junit|espresso-core)|com\.android\.support\.test:(runner|rules|espresso-core))/' "$APP_BUILD_GRADLE"
 
-if ! rg -q "com\.android\.support\.test:runner" "$APP_BUILD_GRADLE"; then
+if ! rg -q "androidx\.test:runner" "$APP_BUILD_GRADLE"; then
   cat >> "$APP_BUILD_GRADLE" <<EOF
 
 dependencies {
-    $TEST_DEP_CONF "com.android.support.test:runner:1.0.2"
-    $TEST_DEP_CONF "com.android.support.test:rules:1.0.2"
-    $TEST_DEP_CONF "com.android.support.test.espresso:espresso-core:3.0.2"
+    $TEST_DEP_CONF "androidx.test:runner:1.5.2"
+    $TEST_DEP_CONF "androidx.test.ext:junit:1.1.5"
+    $TEST_DEP_CONF "androidx.test.espresso:espresso-core:3.5.1"
 }
 EOF
 fi
