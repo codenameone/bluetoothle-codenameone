@@ -130,23 +130,21 @@ result is reported, so unrun PRs don't sit pending indefinitely.
 
 ### One-time setup
 
-The workflow needs two pieces of static state in the repo:
+The workflow needs one piece of static state in the repo:
+**`scripts/device-tests/keystore/device-test.keystore`** — a
+committed, intentionally-public debug keystore so every CI build is
+signed with the same cert. Without this, `adb install -r` rejects
+each new APK with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because the
+debug cert differs across runners. See the keystore directory's
+README for why this is safe.
 
-1. **`DEVICE_TEST_PAT` repository secret** — a fine-grained personal
-   access token scoped to this repository with "Checks: Read and write"
-   permission. `${{ secrets.GITHUB_TOKEN }}` is per-job and dies when
-   `build-and-notify` ends (~3 minutes), well before the maintainer has
-   time to install and run the APK; the PAT lives long enough for the
-   real human-in-the-loop install step.
-2. **`scripts/device-tests/keystore/device-test.keystore`** — a
-   committed, intentionally-public debug keystore so every CI build is
-   signed with the same cert. Without this, `adb install -r` rejects
-   each new APK with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because the
-   debug cert differs across runners. See the keystore directory's
-   README for why this is safe.
-
-If the device sees an HTTP 401 on the check-run PATCH, the PAT secret is
-missing, expired, or lacks the Checks permission.
+The auth token used by the device to PATCH the check-run is the
+workflow's per-job `GITHUB_TOKEN` (which is technically a GitHub App
+installation token under the hood — fine-grained PATs return HTTP 403
+"must authenticate via a GitHub App" against the Check Runs API, so
+GITHUB_TOKEN is the right answer). The token's per-job lifetime is the
+reason the build job stays alive in a polling loop for up to 2h: the
+token dies when the job dies.
 
 ### Why not Bumble + netsim?
 

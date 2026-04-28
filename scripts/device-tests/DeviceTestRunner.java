@@ -308,17 +308,31 @@ public class DeviceTestRunner {
         }
         log.println("initialize OK");
 
-        // Scan until we see ourselves.
+        // Scan until we see ourselves. Log every advertisement we observe
+        // so the on-device transcript distinguishes "scan returns nothing
+        // at all" (library / radio bug) from "scan sees other devices but
+        // not the in-process peripheral" (well-known same-radio
+        // scan-to-self limitation on Samsung and similar BT stacks).
         final AtomicReference<String> foundAddr = new AtomicReference<String>();
         final CountDownLatch scanLatch = new CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicInteger sawAny = new java.util.concurrent.atomic.AtomicInteger();
         bt.startScan(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
                 Map m = (Map) evt.getSource();
                 if (!"scanResult".equals(m.get("status"))) return;
-                if (!EXPECTED_DEVICE_NAME.equals(m.get("name"))) return;
-                if (foundAddr.compareAndSet(null, (String) m.get("address"))) {
-                    scanLatch.countDown();
+                int n = sawAny.incrementAndGet();
+                if (n <= 50) {
+                    // Cap log volume; first 50 advertisements is plenty to
+                    // confirm scan is alive and to spot our peripheral.
+                    log.println("  scan #" + n + " name=" + m.get("name")
+                            + " address=" + m.get("address")
+                            + " rssi=" + m.get("rssi"));
+                }
+                if (EXPECTED_DEVICE_NAME.equals(m.get("name"))) {
+                    if (foundAddr.compareAndSet(null, (String) m.get("address"))) {
+                        scanLatch.countDown();
+                    }
                 }
             }
         }, null, true,
@@ -327,11 +341,17 @@ public class DeviceTestRunner {
                 Bluetooth.MATCH_NUM_MAX_ADVERTISEMENT,
                 Bluetooth.CALLBACK_TYPE_ALL_MATCHES);
         if (!scanLatch.await(30, TimeUnit.SECONDS)) {
-            return "FAIL: scan never saw the in-process peripheral within 30s";
+            int seen = sawAny.get();
+            bt.stopScan();
+            if (seen == 0) {
+                return "FAIL: scan returned NO advertisements at all in 30s — likely a library / radio issue, not just same-device scan-to-self";
+            }
+            return "FAIL: scan saw " + seen + " advertisements but never one named " + EXPECTED_DEVICE_NAME
+                    + " — likely Android same-radio scan-to-self limitation on this device";
         }
         bt.stopScan();
         String address = foundAddr.get();
-        log.println("scan saw " + address);
+        log.println("scan saw " + address + " (after " + sawAny.get() + " total scanResult events)");
 
         // connect
         final CountDownLatch connectLatch = new CountDownLatch(1);
