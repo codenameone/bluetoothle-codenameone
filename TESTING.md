@@ -94,9 +94,11 @@ What this layer does **not** catch:
 
 ## Layer 3 — Android end-to-end with Bumble virtual peripheral (`android-bumble-e2e-tests`)
 
-Status: experimental. Marked `continue-on-error: true` while the
-Bumble↔emulator transport soaks. Failures here are follow-up work, not
-library regressions.
+The whole point of this layer is to surface regressions in the native
+Android code, so the job is required: failures gate the PR. If the
+Bumble↔emulator transport turns out to be unstable in CI, fix the cause
+or remove the job — don't let it pass-through with `continue-on-error`,
+which would silently mask real Android regressions.
 
 A Python [Bumble](https://google.github.io/bumble/) peripheral
 (`scripts/native-tests/bumble_peripheral.py`) attaches to the emulator's

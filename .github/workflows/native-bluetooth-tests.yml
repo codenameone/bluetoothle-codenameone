@@ -134,11 +134,9 @@ jobs:
     # emulator's virtual BT controller and the instrumentation test scans,
     # connects, discovers, reads, writes and subscribes against it. This
     # exercises the real Android GATT stack end-to-end without physical
-    # hardware. Marked continue-on-error while the Bumble<->emulator
-    # transport is still soaking; failures here should be treated as
-    # follow-up work, not a regression in the library itself.
+    # hardware — the whole point is to surface regressions in the native
+    # Android code, so the job is required: failures gate the PR.
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
