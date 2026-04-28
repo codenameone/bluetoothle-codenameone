@@ -129,3 +129,78 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-native-tests.sh
 
+  android-bumble-e2e-tests:
+    # End-to-end coverage: Python Bumble peripheral attaches to the emulator's
+    # netsim virtual radio and the instrumentation test scans/connects/reads/
+    # writes/subscribes against it. Required (no continue-on-error) — its job
+    # is to surface regressions in the native Android code.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17 (required for Android SDK cmdline tools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages required by CN1 Android source build
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-30" \
+            "build-tools;30.0.3"
+
+      - name: Set up Java 11 for Codename One build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p "$HOME/.codenameone"
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
+      - name: Install Bumble (virtual BLE peripheral)
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install bumble
+
+      - name: Run Android emulator + Bumble end-to-end tests
+        uses: ReactiveCircus/android-emulator-runner@v2
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          # -packet-streamer-endpoint enables netsim, the virtual radio backend
+          # Bumble attaches to via its android-netsim transport.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -packet-streamer-endpoint default
+          script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-bumble-e2e.sh
+
+      - name: Capture emulator logcat on failure
+        if: failure()
+        run: |
+          adb logcat -d > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+          adb shell dumpsys bluetooth_manager > "$RUNNER_TEMP/bluetooth-dumpsys.txt" 2>&1 || true
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bumble-e2e-diagnostics
+          path: |
+            ${{ runner.temp }}/logcat.txt
+            ${{ runner.temp }}/bluetooth-dumpsys.txt
+            BTDemo/target/BTDemo-*-android-source/app/build/reports/androidTests/connected
+            BTDemo/target/BTDemo-*-android-source/app/build/outputs/androidTest-results
+

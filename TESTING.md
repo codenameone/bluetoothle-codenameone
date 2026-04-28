@@ -92,20 +92,15 @@ What this layer does **not** catch:
 
 - End-to-end scan/connect/read/write against a real or virtual peripheral.
 
-## Layer 3 — Android end-to-end with Bumble virtual peripheral (`bumble-e2e.yml`)
+## Layer 3 — Android end-to-end with Bumble virtual peripheral (`android-bumble-e2e-tests`)
 
-Lives in a separate workflow that runs on a nightly schedule and on manual
-dispatch — **not** on every PR. The Bumble↔emulator transport on
-GitHub-hosted runners is fragile (system-process crash during instrumentation
-has been observed even though netsim is active and Bumble is advertising),
-so putting it on the PR critical path would gate library changes on
-infrastructure issues unrelated to the library.
-
-Failures here still must be investigated and fixed — there is no
-`continue-on-error`. The job uploads `adb logcat` and the Android test
-report as artifacts on failure to make diagnosis tractable. Trigger
-manually from the Actions tab via `workflow_dispatch` against any branch
-when iterating on Android-side changes.
+The whole point of this layer is to surface regressions in the native
+Android `BluetoothLePlugin` code that the simulator (layer 1) cannot see
+by definition — the simulator is a model of how the bridge *should*
+behave, not a recording of how it actually does. Required job, no
+`continue-on-error`. On failure the job uploads `adb logcat`, the Bumble
+peripheral log, and the Android test report as artifacts under
+`bumble-e2e-diagnostics`.
 
 A Python [Bumble](https://google.github.io/bumble/) peripheral
 (`scripts/native-tests/bumble_peripheral.py`) attaches to the emulator's

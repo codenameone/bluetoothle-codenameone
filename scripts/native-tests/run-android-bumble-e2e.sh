@@ -10,10 +10,6 @@
 #     automatically when the emulator binary supports netsim (API 33+).
 #   - Standard env: JAVA_HOME, ANDROID_SDK_ROOT, CN1 build client jar.
 #
-# Status: experimental. The Bumble<->android-emulator transport occasionally
-# drifts between Android emulator versions, so the corresponding CI job is
-# allowed to fail (continue-on-error: true) until it has soaked.
-#
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -29,24 +25,65 @@ if ! python3 -c "import bumble" 2>/dev/null; then
   exit 1
 fi
 
-PERIPHERAL_LOG="$(mktemp -t bumble-peripheral.XXXXXX).log"
+PERIPHERAL_LOG="${PERIPHERAL_LOG:-$(mktemp -t bumble-peripheral.XXXXXX).log}"
 echo "Starting Bumble peripheral; logs at $PERIPHERAL_LOG"
 
 # Surface the transport choice so users can override it (eg android-emulator,
 # tcp-server:127.0.0.1:9000). Default targets the netsim daemon spawned by
 # modern Android emulators.
 export BUMBLE_TRANSPORT="${BUMBLE_TRANSPORT:-android-netsim}"
+# Bumble's logging is fairly quiet at INFO; turn up to DEBUG when iterating
+# in CI so we can diagnose connection / advertise problems.
+export BUMBLE_LOG_LEVEL="${BUMBLE_LOG_LEVEL:-DEBUG}"
+
+# Surface what netsim is exposing — useful to confirm the emulator side of
+# the link is up before Bumble tries to attach.
+echo "--- netsim CLI status (if available) ---"
+if command -v netsim >/dev/null 2>&1; then
+  netsim version || true
+  netsim devices || true
+elif [[ -x "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" ]]; then
+  "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" version || true
+  "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" devices || true
+else
+  echo "(netsim CLI not found; skipping)"
+fi
+echo "--- adb devices ---"
+adb devices -l || true
 
 python3 "$ROOT_DIR/scripts/native-tests/bumble_peripheral.py" >"$PERIPHERAL_LOG" 2>&1 &
 PERIPHERAL_PID=$!
 
+# Tail the peripheral log to stdout in the background so failures are visible
+# in-line during instrumentation, not only in the cleanup dump.
+tail -F "$PERIPHERAL_LOG" 2>/dev/null | sed 's/^/[bumble] /' &
+TAIL_PID=$!
+
+# Background logcat capture so when the system process dies during
+# instrumentation we still have framework messages from BEFORE the crash.
+LOGCAT_LOG="${LOGCAT_LOG:-$(mktemp -t logcat.XXXXXX).log}"
+( adb logcat -v threadtime > "$LOGCAT_LOG" 2>&1 ) &
+LOGCAT_PID=$!
+
 cleanup() {
-  if kill -0 "$PERIPHERAL_PID" 2>/dev/null; then
+  if kill -0 "${PERIPHERAL_PID:-0}" 2>/dev/null; then
     kill "$PERIPHERAL_PID" 2>/dev/null || true
     wait "$PERIPHERAL_PID" 2>/dev/null || true
   fi
-  echo "--- Bumble peripheral log ---"
-  cat "$PERIPHERAL_LOG" || true
+  if kill -0 "${TAIL_PID:-0}" 2>/dev/null; then
+    kill "$TAIL_PID" 2>/dev/null || true
+  fi
+  if kill -0 "${LOGCAT_PID:-0}" 2>/dev/null; then
+    kill "$LOGCAT_PID" 2>/dev/null || true
+  fi
+  echo "--- Bumble peripheral log (tail) ---"
+  tail -200 "$PERIPHERAL_LOG" 2>/dev/null || true
+  echo "--- logcat (tail) ---"
+  tail -500 "$LOGCAT_LOG" 2>/dev/null || true
+  if [[ -n "${RUNNER_TEMP:-}" ]]; then
+    cp "$PERIPHERAL_LOG" "$RUNNER_TEMP/bumble-peripheral.log" 2>/dev/null || true
+    cp "$LOGCAT_LOG" "$RUNNER_TEMP/logcat-streamed.log" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
@@ -68,5 +105,12 @@ if ! grep -q "advertising as" "$PERIPHERAL_LOG"; then
   exit 1
 fi
 
-echo "Bumble peripheral ready; running instrumentation suite with E2E test"
-BUMBLE_PERIPHERAL=1 exec "$ROOT_DIR/scripts/native-tests/run-android-native-tests.sh"
+echo "Bumble peripheral ready; verifying it shows up on netsim before instrumentation"
+if command -v netsim >/dev/null 2>&1; then
+  netsim devices || true
+elif [[ -x "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" ]]; then
+  "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" devices || true
+fi
+
+echo "Running instrumentation suite with E2E test"
+BUMBLE_PERIPHERAL=1 "$ROOT_DIR/scripts/native-tests/run-android-native-tests.sh"
