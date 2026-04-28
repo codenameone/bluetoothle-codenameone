@@ -120,10 +120,14 @@ jobs:
         run: ./scripts/device-tests/inject-device-test.sh
 
       - name: Build debug APK
+        # CN1's generated gradle wrapper / Android Gradle Plugin is older
+        # than the Java 17 cmdline tools — it can't read Java 17-compiled
+        # class files ("Unsupported class file major version 61"). Use the
+        # Java 11 SDK that's already on the runner from the previous step.
         env:
-          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          JAVA_HOME: ${{ env.JAVA_HOME_11_X64 }}
         run: |
-          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export JAVA_HOME="$JAVA_HOME_11_X64"
           export PATH="$JAVA_HOME/bin:$PATH"
           ANDROID_SRC="$(find BTDemo/target -maxdepth 1 -type d -name '*-android-source' | sort | tail -n 1)"
           chmod +x "$ANDROID_SRC/gradlew"
