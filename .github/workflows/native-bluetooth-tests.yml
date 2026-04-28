@@ -30,6 +30,12 @@ jobs:
           distribution: temurin
           java-version: '11'
 
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p "$HOME/.codenameone"
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
       - name: Install library artifacts locally
         run: mvn -DskipTests -Dcodename1.platform=javase install
 
