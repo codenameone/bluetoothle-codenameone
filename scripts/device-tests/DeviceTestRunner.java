@@ -16,12 +16,17 @@ import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
+import android.view.Gravity;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.codename1.bluetoothle.Bluetooth;
@@ -154,7 +159,11 @@ public class DeviceTestRunner {
                 String summary;
                 boolean ok;
                 StringWriter buf = new StringWriter();
-                PrintWriter log = new PrintWriter(buf);
+                // Tee every line to logcat under tag "DeviceTestRunner" so
+                // `adb logcat -s DeviceTestRunner:*` (or piping that to a
+                // file) gives the maintainer the full log even if the
+                // POST-back to GitHub fails.
+                PrintWriter log = new PrintWriter(new TeeWriter(buf));
                 try {
                     summary = executeTests(activity, log);
                     ok = !summary.startsWith("FAIL:");
@@ -164,19 +173,85 @@ public class DeviceTestRunner {
                     ok = false;
                 }
                 log.flush();
-                postResult(activity, ok, summary + "\n\n```\n" + buf.toString() + "```");
-                final boolean finalOk = ok;
-                final String finalSummary = summary;
-                activity.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(activity,
-                                (finalOk ? "PASS: " : "FAIL: ") + finalSummary,
-                                Toast.LENGTH_LONG).show();
-                    }
-                });
+
+                String fullLog = buf.toString();
+                Log.i(TAG, "test summary: " + summary);
+
+                String reportStatus = postResult(activity, ok, summary + "\n\n```\n" + fullLog + "```");
+                Log.i(TAG, "report-back to GitHub: " + reportStatus);
+
+                showResultDialog(activity, ok, summary, fullLog, reportStatus);
             }
         }, "device-test-runner").start();
+    }
+
+    private static void showResultDialog(final Activity activity, final boolean ok,
+                                         final String summary, final String fullLog,
+                                         final String reportStatus) {
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                String header = (ok ? "PASS" : "FAIL") + " — " + summary
+                        + "\n\nReport back: " + reportStatus
+                        + "\n\nFor a copyable transcript: adb logcat -s DeviceTestRunner:*\n\n";
+                TextView text = new TextView(activity);
+                text.setTextSize(12);
+                text.setPadding(24, 24, 24, 24);
+                text.setMovementMethod(new ScrollingMovementMethod());
+                text.setGravity(Gravity.TOP);
+                text.setText(header + fullLog);
+                ScrollView scroll = new ScrollView(activity);
+                scroll.addView(text);
+
+                new AlertDialog.Builder(activity)
+                        .setTitle(ok ? "Device test PASS" : "Device test FAIL")
+                        .setView(scroll)
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+        });
+    }
+
+    /// Forwards everything written to the underlying writer to logcat as
+    /// well, line by line, under tag DeviceTestRunner. Lets the maintainer
+    /// pipe the on-device log back through `adb logcat` even when the
+    /// HTTPS POST to GitHub fails.
+    private static class TeeWriter extends java.io.Writer {
+        private final java.io.Writer delegate;
+        private final StringBuilder line = new StringBuilder();
+
+        TeeWriter(java.io.Writer delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void write(char[] cbuf, int off, int len) throws IOException {
+            delegate.write(cbuf, off, len);
+            for (int i = off; i < off + len; i++) {
+                char c = cbuf[i];
+                if (c == '\n') {
+                    Log.i(TAG, line.toString());
+                    line.setLength(0);
+                } else if (c != '\r') {
+                    line.append(c);
+                }
+            }
+        }
+
+        @Override
+        public void flush() throws IOException {
+            delegate.flush();
+            if (line.length() > 0) {
+                Log.i(TAG, line.toString());
+                line.setLength(0);
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            flush();
+            delegate.close();
+        }
     }
 
     private static String executeTests(Activity activity, PrintWriter log) throws Exception {
@@ -349,19 +424,24 @@ public class DeviceTestRunner {
         return android.util.Base64.decode(s, android.util.Base64.DEFAULT);
     }
 
-    private static void postResult(Context ctx, boolean ok, String summary) {
+    /// Returns a human-readable status string describing how the POST went.
+    /// Always returns something — never throws — so the caller can include
+    /// it in the on-device result dialog regardless of whether GitHub
+    /// accepted the update.
+    private static String postResult(Context ctx, boolean ok, String summary) {
         Properties cfg = loadConfig(ctx);
         if (cfg == null) {
-            Log.w(TAG, "no config; cannot report result");
-            return;
+            return "no config asset (test mode mis-injected?)";
         }
         String token = cfg.getProperty("github_token");
         String repo = cfg.getProperty("repo");
         String checkRunId = cfg.getProperty("check_run_id");
         if (token == null || repo == null || checkRunId == null) {
-            Log.w(TAG, "incomplete config; cannot report result");
-            return;
+            return "incomplete config (token/repo/check_run_id missing)";
         }
+        // Some HTTP clients don't allow PATCH on Android's HttpURLConnection
+        // — Android's HTTP/1.1 stack does, but older versions disallow
+        // PATCH. Fall back to X-HTTP-Method-Override.
         String url = "https://api.github.com/repos/" + repo + "/check-runs/" + checkRunId;
         String safeSummary = summary == null ? "" : summary;
         if (safeSummary.length() > 60_000) {
@@ -375,9 +455,15 @@ public class DeviceTestRunner {
                 + "\"summary\":" + jsonEscape(safeSummary)
                 + "}"
                 + "}";
+        HttpURLConnection conn = null;
         try {
-            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setRequestMethod("PATCH");
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            try {
+                conn.setRequestMethod("PATCH");
+            } catch (java.net.ProtocolException pe) {
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+            }
             conn.setDoOutput(true);
             conn.setConnectTimeout(15_000);
             conn.setReadTimeout(15_000);
@@ -389,11 +475,35 @@ public class DeviceTestRunner {
             out.write(json.getBytes("UTF-8"));
             out.close();
             int code = conn.getResponseCode();
-            Log.i(TAG, "GitHub check-run update returned " + code);
-            conn.disconnect();
-        } catch (IOException ex) {
-            Log.e(TAG, "failed to report result to GitHub", ex);
+            String body = readStream(code >= 400 ? conn.getErrorStream() : conn.getInputStream());
+            String tail = body.length() > 400 ? body.substring(0, 400) + "…" : body;
+            String status = "HTTP " + code + " " + (code >= 200 && code < 300 ? "OK" : "FAIL")
+                    + (tail.isEmpty() ? "" : (" body=" + tail));
+            Log.i(TAG, "GitHub check-run update " + status);
+            return status;
+        } catch (Throwable ex) {
+            String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+            Log.e(TAG, "failed to report result to GitHub: " + msg, ex);
+            return "request threw " + msg;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
+    }
+
+    private static String readStream(java.io.InputStream in) {
+        if (in == null) return "";
+        StringBuilder sb = new StringBuilder();
+        byte[] buf = new byte[2048];
+        try {
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                sb.append(new String(buf, 0, n, "UTF-8"));
+            }
+        } catch (IOException ignore) {
+        } finally {
+            try { in.close(); } catch (IOException ignore) {}
+        }
+        return sb.toString();
     }
 
     private static Properties loadConfig(Context ctx) {
