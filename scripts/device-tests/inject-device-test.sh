@@ -76,30 +76,19 @@ chmod 600 "$ASSETS_DIR/device_test_config.properties"
 # there. The CN1 lib only declares the legacy BLUETOOTH/BLUETOOTH_ADMIN +
 # COARSE_LOCATION; on a real Android 12+ device we additionally need
 # BLUETOOTH_SCAN/CONNECT/ADVERTISE for peripheral + central operation.
-#
-# BLUETOOTH_SCAN is declared with usesPermissionFlags="neverForLocation"
-# so the OS doesn't require system-wide Location services to be ON for
-# BLE scans to return results. Without this, Samsung-style stacks
-# silently filter every advertisement when Location is off — observed
-# as "scan returned NO advertisements at all in 30s" with no other
-# error path. (Layer 1 / smoke tests can't catch this; Layer 3 found it.)
-add_permission_with_flags() {
+# We don't use usesPermissionFlags="neverForLocation" because that
+# attribute is API 31 and AAPT against compileSdkVersion 30 rejects it;
+# the on-device diagnostics will tell us if Location services are off.
+add_permission() {
   local perm="$1"
-  local flags="$2"
-  local insert
-  if [[ -n "$flags" ]]; then
-    insert="<uses-permission android:name=\"android.permission.${perm}\" android:usesPermissionFlags=\"${flags}\"/>"
-  else
-    insert="<uses-permission android:name=\"android.permission.${perm}\"/>"
-  fi
   if ! grep -q "android.permission.${perm}" "$MANIFEST"; then
-    perl -i -pe "s|<uses-permission android:name=\"android.permission.BLUETOOTH\"/>|<uses-permission android:name=\"android.permission.BLUETOOTH\"/>${insert}|" "$MANIFEST"
+    perl -i -pe "s|<uses-permission android:name=\"android.permission.BLUETOOTH\"/>|<uses-permission android:name=\"android.permission.BLUETOOTH\"/><uses-permission android:name=\"android.permission.${perm}\"/>|" "$MANIFEST"
   fi
 }
-add_permission_with_flags "BLUETOOTH_SCAN" "neverForLocation"
-add_permission_with_flags "BLUETOOTH_CONNECT" ""
-add_permission_with_flags "BLUETOOTH_ADVERTISE" ""
-add_permission_with_flags "ACCESS_FINE_LOCATION" ""
+add_permission "BLUETOOTH_SCAN"
+add_permission "BLUETOOTH_CONNECT"
+add_permission "BLUETOOTH_ADVERTISE"
+add_permission "ACCESS_FINE_LOCATION"
 
 # 5. Patch the gradle file the same way run-android-native-tests.sh does
 # — the cn1:build target writes 0 / '0' literals expecting downstream
