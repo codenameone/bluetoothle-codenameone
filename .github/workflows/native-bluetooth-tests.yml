@@ -178,7 +178,13 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         with:
-          api-level: 34
+          # API 33 + google_apis target: empirically more reliable for
+          # netsim-backed BT on GitHub-hosted runners than the default
+          # API 34 / aosp_atd image, which cannot bring the BT service
+          # online with -packet-streamer-endpoint default (mEnable=true /
+          # state=OFF / "Bluetooth Service not connected").
+          api-level: 33
+          target: google_apis
           arch: x86_64
           profile: pixel_6
           disable-animations: true
