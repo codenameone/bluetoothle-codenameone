@@ -115,11 +115,16 @@ public class DeviceTestRunner {
     }
 
     private static String[] requiredPermissions() {
+        // Use literal strings rather than Manifest.permission.* constants:
+        // BLUETOOTH_CONNECT/SCAN/ADVERTISE are API 31+ symbols and CN1's
+        // generated project compiles against compileSdkVersion 30, where
+        // those identifiers do not exist. The literal values are stable
+        // and the runtime is always >= the device's actual API level.
         if (Build.VERSION.SDK_INT >= 31) {
             return new String[] {
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_ADVERTISE,
+                    "android.permission.BLUETOOTH_CONNECT",
+                    "android.permission.BLUETOOTH_SCAN",
+                    "android.permission.BLUETOOTH_ADVERTISE",
                     Manifest.permission.ACCESS_FINE_LOCATION
             };
         }
