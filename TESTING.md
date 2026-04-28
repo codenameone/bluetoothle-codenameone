@@ -92,38 +92,54 @@ What this layer does **not** catch:
 
 - End-to-end scan/connect/read/write against a real or virtual peripheral.
 
-## Layer 3 — Android end-to-end with Bumble virtual peripheral (`android-bumble-e2e-tests`)
+## Layer 3 — Real-device Android end-to-end (`device-test.yml`)
 
 The whole point of this layer is to surface regressions in the native
 Android `BluetoothLePlugin` code that the simulator (layer 1) cannot see
 by definition — the simulator is a model of how the bridge *should*
 behave, not a recording of how it actually does. Required job, no
-`continue-on-error`. On failure the job uploads `adb logcat`, the Bumble
-peripheral log, and the Android test report as artifacts under
-`bumble-e2e-diagnostics`.
+`continue-on-error`.
 
-A Python [Bumble](https://google.github.io/bumble/) peripheral
-(`scripts/native-tests/bumble_peripheral.py`) attaches to the emulator's
-virtual BT controller via the `android-netsim` transport and advertises a
-deterministic GATT layout. The instrumentation test
-(`scripts/native-tests/BluetoothEmulatorEndToEndTest.java`, injected into the
-generated Android project when `BUMBLE_PERIPHERAL=1`) drives
-`BluetoothNativeBridgeImpl` through the full lifecycle: scan → connect →
-discover → read → write → round-trip read → subscribe → notification.
+The job runs against a real Android device (the maintainer's phone). On
+each PR/push it:
 
-The wrapper `scripts/native-tests/run-android-bumble-e2e.sh` boots the
-peripheral, waits for it to advertise, then defers to the standard
-`run-android-native-tests.sh` with `BUMBLE_PERIPHERAL=1` so the e2e test class
-is injected alongside the smoke test.
+1. Builds a fresh BTDemo APK with the library version under test.
+2. Injects `scripts/device-tests/DeviceTestRunner.java` into the generated
+   Android source — a self-contained driver that on activity start brings
+   up an in-process BLE peripheral via `BluetoothLeAdvertiser` +
+   `BluetoothGattServer` (deterministic UUIDs matching the simulator and
+   the bumble peripheral), then drives the cn1-bluetooth public API as a
+   central against itself end-to-end (scan / connect / discover / read /
+   write / subscribe).
+3. Bakes a one-shot GitHub token + the SHA's check-run id into the APK as
+   an asset.
+4. Creates a `device-test (real-hardware)` check run on the PR's commit
+   in `in_progress` state.
+5. Uploads the APK as a workflow artifact and posts a PR comment with the
+   download link plus an `adb install / am start` snippet.
 
-The CI emulator is started with `-packet-streamer-endpoint default` so the
-modern netsim virtual radio backend is enabled.
+The maintainer's task on each CI run:
+- Download the APK from the workflow run.
+- `adb install` and launch (or sideload).
+- Grant the Bluetooth permission prompt on first launch.
 
-What this layer catches:
+That's it. The test runs on its own and PATCHes the check run with the
+result, which resolves the PR's "device-test (real-hardware)" check
+automatically. A watchdog job times the check out after 2h if no device
+result is reported, so unrun PRs don't sit pending indefinitely.
 
-- Real GATT timing on the Android stack.
-- End-to-end value round-trips against a known-shaped peripheral.
-- Subscription/notification delivery.
+### Why not Bumble + netsim?
+
+We tried it (`scripts/native-tests/bumble_peripheral.py` + the Bumble e2e
+script + workflow) and proved empirically across 8 iterations that BT
+cannot be enabled on GitHub-hosted Linux runners with
+`-packet-streamer-endpoint default`, regardless of AVD config (API
+33+google_apis and API 34+aosp_atd both fail the same way:
+`mEnable=true / state=OFF / "Bluetooth Service not connected"` — the BT
+system service binder never binds, regardless of whether Bumble is
+involved). The Bumble scripts and instrumentation test stay in the repo
+under `scripts/native-tests/` for future use on a self-hosted runner with
+real BT or if the emulator+netsim path becomes viable.
 
 ## iOS end-to-end coverage
 

@@ -129,101 +129,13 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-native-tests.sh
 
-  android-bumble-e2e-tests:
-    # End-to-end coverage: Python Bumble peripheral attaches to the emulator's
-    # netsim virtual radio and the instrumentation test scans/connects/reads/
-    # writes/subscribes against it. Required (no continue-on-error) — its job
-    # is to surface regressions in the native Android code.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Java 17 (required for Android SDK cmdline tools)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages required by CN1 Android source build
-        run: |
-          yes | sdkmanager --licenses
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-30" \
-            "build-tools;30.0.3"
-
-      - name: Set up Java 11 for Codename One build
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '11'
-
-      - name: Setup Codename One Build Client
-        run: |
-          mkdir -p "$HOME/.codenameone"
-          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
-            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-
-      - name: Install Bumble (virtual BLE peripheral)
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install bumble
-
-      - name: Run Android emulator + Bumble end-to-end tests
-        uses: ReactiveCircus/android-emulator-runner@v2
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-        with:
-          # API 33 + google_apis target: empirically more reliable for
-          # netsim-backed BT on GitHub-hosted runners than the default
-          # API 34 / aosp_atd image, which cannot bring the BT service
-          # online with -packet-streamer-endpoint default (mEnable=true /
-          # state=OFF / "Bluetooth Service not connected").
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          # -packet-streamer-endpoint enables netsim, the virtual radio backend
-          # Bumble attaches to via its android-netsim transport.
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -packet-streamer-endpoint default
-          script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-bumble-e2e.sh
-
-      - name: Capture emulator logcat on failure
-        if: failure()
-        # The emulator is already torn down by android-emulator-runner by the
-        # time this step runs, so adb commands would hang. The runtime log
-        # capture inside run-android-bumble-e2e.sh has already streamed
-        # logcat into RUNNER_TEMP/logcat-streamed.log while the emulator
-        # was alive — that's the authoritative source. This step just
-        # makes a best-effort, time-bounded attempt at any extra adb data.
-        timeout-minutes: 1
-        run: |
-          set +e
-          timeout 20 adb logcat -d > "$RUNNER_TEMP/logcat-postmortem.txt" 2>&1 || \
-            echo "(adb logcat unavailable; emulator already torn down)" > "$RUNNER_TEMP/logcat-postmortem.txt"
-          timeout 20 adb shell dumpsys bluetooth_manager > "$RUNNER_TEMP/bluetooth-dumpsys.txt" 2>&1 || \
-            echo "(adb dumpsys unavailable; emulator already torn down)" > "$RUNNER_TEMP/bluetooth-dumpsys.txt"
-          true
-
-      - name: Upload diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bumble-e2e-diagnostics
-          # logcat-streamed.log + bumble-peripheral.log are populated from
-          # inside run-android-bumble-e2e.sh while the emulator is still
-          # alive; the *-postmortem files are best-effort post-teardown.
-          if-no-files-found: warn
-          path: |
-            ${{ runner.temp }}/logcat-streamed.log
-            ${{ runner.temp }}/logcat-postmortem.txt
-            ${{ runner.temp }}/bumble-peripheral.log
-            ${{ runner.temp }}/bluetooth-dumpsys.txt
-            BTDemo/target/BTDemo-*-android-source/app/build/reports/androidTests/connected
-            BTDemo/target/BTDemo-*-android-source/app/build/outputs/androidTest-results
-
+# Layer 3 (real Android end-to-end against an actual GATT peripheral) lives
+# in .github/workflows/device-test.yml. We tried Bumble + netsim on hosted
+# runners and proved empirically that BT cannot be enabled there
+# (mEnable=true / state=OFF / "Bluetooth Service not connected") regardless
+# of AVD config, so the device-test workflow targets a real Android device
+# (the maintainer's phone) instead. The Bumble script
+# (scripts/native-tests/run-android-bumble-e2e.sh + bumble_peripheral.py +
+# BluetoothEmulatorEndToEndTest.java) stays in the repo for use on a
+# self-hosted runner with real BT, or for future re-evaluation if the
+# emulator+netsim path becomes viable.

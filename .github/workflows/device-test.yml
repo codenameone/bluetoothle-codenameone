@@ -1,0 +1,222 @@
+name: Device Test
+
+# Layer 3 (real Android end-to-end against an actual GATT peripheral) for
+# this library. The Bumble + netsim emulator path is fundamentally broken
+# on GitHub-hosted runners (BT system service won't bind), so we instead
+# build a freshly-injected APK per CI run and ship it to the maintainer's
+# real Android device, which:
+#   - acts as a BLE peripheral in-process (BluetoothLeAdvertiser +
+#     BluetoothGattServer) with deterministic UUIDs matching the simulator
+#     and the bumble peripheral
+#   - drives the cn1-bluetooth public API as a central against itself
+#   - reports pass/fail to the GitHub Check Run that this workflow opens
+#
+# The maintainer's task on each CI run: download the APK from the PR
+# comment, install, launch, grant the permission prompt — that's it. The
+# test runs on its own and the PR check resolves automatically.
+#
+# The check times out after 2h if no result is reported, so unrun PRs
+# don't sit pending indefinitely.
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    branches: [main, master]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '**/*.md'
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-and-notify:
+    runs-on: ubuntu-latest
+    outputs:
+      check_run_id: ${{ steps.create_check.outputs.check_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17 (Android SDK cmdline tools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages required by CN1 Android source build
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-30" \
+            "build-tools;30.0.3"
+
+      - name: Set up Java 11 for Codename One build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p "$HOME/.codenameone"
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
+      - name: Resolve commit SHA for the check
+        id: resolve_sha
+        run: |
+          if [[ -n "${{ github.event.pull_request.head.sha }}" ]]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pending check run
+        id: create_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.resolve_sha.outputs.sha }}
+        run: |
+          response=$(gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${{ github.repository }}/check-runs" \
+            -f name="device-test (real-hardware)" \
+            -f head_sha="$SHA" \
+            -f status="in_progress" \
+            -f "output[title]=Waiting for device test" \
+            -f "output[summary]=The maintainer will install the APK uploaded to this run, launch it, and grant the BT permission prompt. The check will resolve automatically when the device reports a result.")
+          check_run_id=$(echo "$response" | jq -r '.id')
+          echo "check_run_id=$check_run_id" >> "$GITHUB_OUTPUT"
+          echo "created check run $check_run_id"
+
+      - name: Build BTDemo Android source
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_11_X64 }}
+        run: |
+          export JAVA_HOME="$JAVA_HOME_11_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          mvn -DskipTests -Dcodename1.platform=android install
+          mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
+
+      - name: Inject DeviceTestRunner into the generated project
+        env:
+          GITHUB_TOKEN_FOR_DEVICE: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_CHECK_RUN_ID: ${{ steps.create_check.outputs.check_run_id }}
+        run: ./scripts/device-tests/inject-device-test.sh
+
+      - name: Build debug APK
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          ANDROID_SRC="$(find BTDemo/target -maxdepth 1 -type d -name '*-android-source' | sort | tail -n 1)"
+          chmod +x "$ANDROID_SRC/gradlew"
+          ( cd "$ANDROID_SRC" && ./gradlew assembleDebug --stacktrace )
+          mkdir -p artifact
+          cp "$ANDROID_SRC"/app/build/outputs/apk/debug/*.apk artifact/btdemo-device-test.apk
+
+      - name: Upload device-test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-test-apk
+          path: artifact/btdemo-device-test.apk
+          retention-days: 7
+
+      - name: Resolve artifact download URL
+        id: artifact_url
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The upload-artifact step's URL isn't exposed directly, so fall
+          # back to the run page; reviewers click through to download.
+          run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "run_url=$run_url" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on PR with install instructions
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.resolve_sha.outputs.sha }}
+          RUN_URL: ${{ steps.artifact_url.outputs.run_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          body=$(cat <<EOF
+          ## On-device test ready
+
+          A fresh BTDemo APK with the cn1-bluetooth library at $SHA has been built
+          and uploaded as a workflow artifact. To resolve the **device-test
+          (real-hardware)** check on this PR:
+
+          1. Download \`device-test-apk\` from [this workflow run]($RUN_URL).
+          2. With your phone connected via USB, run:
+             \`\`\`
+             adb install -r btdemo-device-test.apk
+             adb shell am start -n com.codename1.btle/.BTDemoStub
+             \`\`\`
+             Or sideload the APK and tap to launch.
+          3. Grant the Bluetooth permission prompt on first launch.
+
+          The test brings up an in-process BLE peripheral, drives the
+          cn1-bluetooth API as a central against it (scan / connect /
+          discover / read / write / subscribe), and posts the result to the
+          PR check. No further taps required.
+
+          The check times out after 2h if no result is reported.
+          EOF
+          )
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+            -f body="$body"
+
+  watchdog:
+    needs: build-and-notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 130
+    steps:
+      - name: Wait for device-test check to complete or time out
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHECK_RUN_ID: ${{ needs.build-and-notify.outputs.check_run_id }}
+        run: |
+          deadline=$(( $(date +%s) + 2*3600 ))
+          while [[ $(date +%s) -lt $deadline ]]; do
+            status=$(gh api "repos/${{ github.repository }}/check-runs/$CHECK_RUN_ID" --jq '.status')
+            conclusion=$(gh api "repos/${{ github.repository }}/check-runs/$CHECK_RUN_ID" --jq '.conclusion')
+            echo "$(date -u +%H:%M:%S) status=$status conclusion=$conclusion"
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                exit 0
+              fi
+              echo "device-test check completed with conclusion=$conclusion"
+              exit 1
+            fi
+            sleep 60
+          done
+          echo "device-test check timed out — flipping to neutral conclusion=timed_out"
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/check-runs/$CHECK_RUN_ID" \
+            -f status="completed" \
+            -f conclusion="timed_out" \
+            -f "output[title]=Device test timed out" \
+            -f "output[summary]=No result was reported by the maintainer's device within 2 hours. Re-run this workflow once the test has been launched on the device."
+          exit 1
