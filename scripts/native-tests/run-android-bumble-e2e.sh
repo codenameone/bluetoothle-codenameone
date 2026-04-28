@@ -51,18 +51,31 @@ fi
 echo "--- adb devices ---"
 adb devices -l || true
 
+# Bumble at DEBUG is verbose. Silence stdout to a file only — no inline
+# tail — to avoid stealing CPU/disk during the heavy Maven phase. The
+# cleanup dump prints the tail on failure.
 python3 "$ROOT_DIR/scripts/native-tests/bumble_peripheral.py" >"$PERIPHERAL_LOG" 2>&1 &
 PERIPHERAL_PID=$!
 
-# Tail the peripheral log to stdout in the background so failures are visible
-# in-line during instrumentation, not only in the cleanup dump.
-tail -F "$PERIPHERAL_LOG" 2>/dev/null | sed 's/^/[bumble] /' &
-TAIL_PID=$!
-
-# Background logcat capture so when the system process dies during
-# instrumentation we still have framework messages from BEFORE the crash.
+# Background logcat capture, FILTERED to library + framework tags we
+# actually care about. Capturing the full firehose was generating tens of
+# MBs/min on a runner already pushing the memory ceiling and contributed
+# to system_server "Lost network stack" cascades during gradle's APK
+# install phase.
 LOGCAT_LOG="${LOGCAT_LOG:-$(mktemp -t logcat.XXXXXX).log}"
-( adb logcat -v threadtime > "$LOGCAT_LOG" 2>&1 ) &
+adb logcat -c 2>/dev/null || true
+( adb logcat -v threadtime \
+    AndroidRuntime:E \
+    ActivityManager:W \
+    PackageManager:W \
+    System.err:W \
+    BluetoothLePlugin:* \
+    BluetoothManager:* \
+    BluetoothAdapter:* \
+    TestRunner:* \
+    com.codename1.bluetoothle:* \
+    '*:F' \
+    > "$LOGCAT_LOG" 2>&1 ) &
 LOGCAT_PID=$!
 
 cleanup() {
@@ -70,15 +83,12 @@ cleanup() {
     kill "$PERIPHERAL_PID" 2>/dev/null || true
     wait "$PERIPHERAL_PID" 2>/dev/null || true
   fi
-  if kill -0 "${TAIL_PID:-0}" 2>/dev/null; then
-    kill "$TAIL_PID" 2>/dev/null || true
-  fi
   if kill -0 "${LOGCAT_PID:-0}" 2>/dev/null; then
     kill "$LOGCAT_PID" 2>/dev/null || true
   fi
   echo "--- Bumble peripheral log (tail) ---"
   tail -200 "$PERIPHERAL_LOG" 2>/dev/null || true
-  echo "--- logcat (tail) ---"
+  echo "--- logcat (filtered, tail) ---"
   tail -500 "$LOGCAT_LOG" 2>/dev/null || true
   if [[ -n "${RUNNER_TEMP:-}" ]]; then
     cp "$PERIPHERAL_LOG" "$RUNNER_TEMP/bumble-peripheral.log" 2>/dev/null || true
