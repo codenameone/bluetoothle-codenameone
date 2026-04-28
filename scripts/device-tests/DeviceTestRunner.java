@@ -294,7 +294,7 @@ public class DeviceTestRunner {
         }
     }
 
-    private static String drivCentral(Activity activity, Peripheral peripheral, PrintWriter log) throws Exception {
+    private static String drivCentral(Activity activity, Peripheral peripheral, final PrintWriter log) throws Exception {
         Bluetooth bt = new Bluetooth();
 
         // initialize is a *blocking* method on Bluetooth: it registers its
