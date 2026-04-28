@@ -87,11 +87,26 @@ perl -0pi -e "s/com\\.android\\.support:support-v4:0\\.\\+/com.android.support:s
 
 TEST_DIR="$ANDROID_SRC/app/src/androidTest/java/com/codename1/btle"
 TEST_FILE="$TEST_DIR/BluetoothNativeInstrumentationTest.java"
+E2E_TEST_FILE="$TEST_DIR/BluetoothEmulatorEndToEndTest.java"
+E2E_TEST_SOURCE="$ROOT_DIR/scripts/native-tests/BluetoothEmulatorEndToEndTest.java"
 BRIDGE_STUB="$ANDROID_SRC/app/src/main/java/com/codename1/bluetoothle/BluetoothNativeBridgeStub.java"
 BRIDGE_IMPL="$ANDROID_SRC/app/src/main/java/com/codename1/bluetoothle/BluetoothNativeBridgeImpl.java"
 LEGACY_JSON_UTILS_DIR="$ANDROID_SRC/app/src/main/java/com/codename1/util"
 
 mkdir -p "$TEST_DIR"
+
+# Optionally inject the Bumble end-to-end instrumentation test. Gated on
+# BUMBLE_PERIPHERAL=1 so the existing fast smoke job stays unaffected; when
+# enabled the caller must also start scripts/native-tests/bumble_peripheral.py
+# in the background and ensure the emulator is netsim-enabled so Bumble can
+# attach as a virtual peripheral.
+if [[ "${BUMBLE_PERIPHERAL:-0}" == "1" ]]; then
+  if [[ ! -f "$E2E_TEST_SOURCE" ]]; then
+    echo "BUMBLE_PERIPHERAL=1 but $E2E_TEST_SOURCE is missing" >&2
+    exit 1
+  fi
+  cp "$E2E_TEST_SOURCE" "$E2E_TEST_FILE"
+fi
 
 rm -f "$LEGACY_JSON_UTILS_DIR/JSONParserUtils.java" "$LEGACY_JSON_UTILS_DIR/JSONUtils.java"
 

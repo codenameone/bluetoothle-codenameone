@@ -29,6 +29,24 @@
             <version>${project.version}</version>
             <type>pom</type>
         </dependency>
+
+        <!-- Simulator-backed CN1 UnitTest suite. cn1:test runs the
+             com.codename1.impl.javase.TestRunner which needs the JavaSE port
+             on the classpath, plus the JavaSE simulator implementation of the
+             Bluetooth bridge so the public API can be exercised without
+             physical hardware. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javase</artifactId>
+            <version>${cn1.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-bluetooth-javase</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
