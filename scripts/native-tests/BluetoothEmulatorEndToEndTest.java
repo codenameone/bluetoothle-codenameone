@@ -4,6 +4,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import android.app.Activity;
+import android.app.Instrumentation;
+import android.content.Context;
+import android.content.Intent;
+import android.support.test.InstrumentationRegistry;
 import android.support.test.runner.AndroidJUnit4;
 import android.util.Base64;
 
@@ -41,10 +46,27 @@ public class BluetoothEmulatorEndToEndTest {
 
     private BluetoothNativeBridgeImpl bridge;
     private final List<String> activeCallbacks = new ArrayList<String>();
+    private Activity launchedActivity;
     private String foundAddress;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
+        // The Android plugin's initializeAction calls bridge.getActivity()
+        // (-> AndroidNativeUtil.getActivity()) which returns null until a CN1
+        // activity has been started, causing an NPE on its first
+        // getSystemService() call. Launch the BTDemo stub here so the test
+        // exercises the same activity-attached code path real users hit.
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context targetContext = instrumentation.getTargetContext();
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.setClassName(targetContext, "com.codename1.btle.BTDemoStub");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        launchedActivity = instrumentation.startActivitySync(intent);
+        assertNotNull("BTDemoStub activity must launch", launchedActivity);
+        // Give the CN1 framework a beat to initialize Display / register the
+        // activity in AndroidNativeUtil before we hit the bridge.
+        Thread.sleep(1500);
+
         bridge = new BluetoothNativeBridgeImpl();
     }
 
@@ -54,6 +76,9 @@ public class BluetoothEmulatorEndToEndTest {
             BluetoothCallbackRegistry.removeMethodCallback(key);
         }
         activeCallbacks.clear();
+        if (launchedActivity != null) {
+            launchedActivity.finish();
+        }
     }
 
     @Test
