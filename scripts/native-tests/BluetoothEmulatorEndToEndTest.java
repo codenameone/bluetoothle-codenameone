@@ -16,21 +16,19 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 /// End-to-end Android instrumentation test driving the BluetoothNativeBridge
 /// against a Python Bumble peripheral running on the host. Asserts the same
 /// UUIDs and values defined in scripts/native-tests/bumble_peripheral.py — keep
 /// the two in lock-step.
 ///
-/// Skipped automatically if the BUMBLE_PERIPHERAL_AVAILABLE instrumentation
-/// argument is not set, so the existing fast smoke test still runs in
-/// environments where Bumble is not wired up.
+/// Source level: the generated Android project compiles with `-source 7`, so
+/// no lambdas / method references / try-with-resources etc. Match the style
+/// of the existing smoke instrumentation test.
 @RunWith(AndroidJUnit4.class)
 public class BluetoothEmulatorEndToEndTest {
 
@@ -42,7 +40,7 @@ public class BluetoothEmulatorEndToEndTest {
     private static final byte[] EXPECTED_READ_VALUE = "BUMBLE_OK".getBytes();
 
     private BluetoothNativeBridgeImpl bridge;
-    private final Map<String, BluetoothCallback> activeCallbacks = new HashMap<>();
+    private final List<String> activeCallbacks = new ArrayList<String>();
     private String foundAddress;
 
     @Before
@@ -52,7 +50,7 @@ public class BluetoothEmulatorEndToEndTest {
 
     @After
     public void tearDown() {
-        for (String key : activeCallbacks.keySet()) {
+        for (String key : activeCallbacks) {
             BluetoothCallbackRegistry.removeMethodCallback(key);
         }
         activeCallbacks.clear();
@@ -62,8 +60,13 @@ public class BluetoothEmulatorEndToEndTest {
     public void scanConnectReadWriteSubscribe() throws Exception {
         // Bring the bridge up. initialize/enable are best-effort: emulator may
         // already report enabled. If they fail, scan will surface the error.
-        runOp("initialize", () -> bridge.initialize(true, false, "e2e"), 5000);
-        runOp("enable", bridge::enable, 5000);
+        BluetoothCallback initCb = registerCallback("initialize");
+        assertTrue("initialize dispatch", bridge.initialize(true, false, "e2e"));
+        initCb.getResponseAndWait(5000);
+
+        BluetoothCallback enableCb = registerCallback("enable");
+        assertTrue("enable dispatch", bridge.enable());
+        enableCb.getResponseAndWait(5000);
 
         BluetoothCallback scanCb = registerCallback("startScan");
         assertTrue("startScan dispatch", bridge.startScan("", true, 0, 1, 1, 1));
@@ -71,7 +74,10 @@ public class BluetoothEmulatorEndToEndTest {
         foundAddress = (String) scanResult.get("address");
         assertNotNull("scanResult must include address", foundAddress);
         assertEquals(EXPECTED_DEVICE_NAME, scanResult.get("name"));
-        runOp("stopScan", bridge::stopScan, 5000);
+
+        BluetoothCallback stopCb = registerCallback("stopScan");
+        assertTrue("stopScan dispatch", bridge.stopScan());
+        stopCb.getResponseAndWait(5000);
 
         BluetoothCallback connectCb = registerCallback("connect");
         assertTrue("connect dispatch", bridge.connect(foundAddress));
@@ -113,24 +119,16 @@ public class BluetoothEmulatorEndToEndTest {
         // window for the subscription handshake + first emission.
         waitForStatus(subCb, "subscribedResult", 10000);
 
-        runOp("disconnect", () -> bridge.disconnect(foundAddress), 5000);
-    }
-
-    private interface BridgeCall {
-        boolean invoke();
+        BluetoothCallback disconnectCb = registerCallback("disconnect");
+        assertTrue("disconnect dispatch", bridge.disconnect(foundAddress));
+        disconnectCb.getResponseAndWait(5000);
     }
 
     private BluetoothCallback registerCallback(String key) {
         BluetoothCallback cb = new BluetoothCallback();
         BluetoothCallbackRegistry.setMethodCallback(key, cb);
-        activeCallbacks.put(key, cb);
+        activeCallbacks.add(key);
         return cb;
-    }
-
-    private Map runOp(String key, BridgeCall call, int timeoutMs) {
-        BluetoothCallback cb = registerCallback(key);
-        assertTrue(key + " dispatch", call.invoke());
-        return cb.getResponseAndWait(timeoutMs);
     }
 
     private Map waitForResponse(BluetoothCallback cb, int timeoutMs) {
@@ -141,11 +139,12 @@ public class BluetoothEmulatorEndToEndTest {
 
     private Map waitForStatus(BluetoothCallback cb, String expectedStatus, int timeoutMs) throws InterruptedException {
         long deadline = System.currentTimeMillis() + timeoutMs;
-        AtomicReference<Map> last = new AtomicReference<>();
+        Map last = null;
         while (System.currentTimeMillis() < deadline) {
-            Map response = cb.getResponseAndWait(Math.max(50, (int) (deadline - System.currentTimeMillis())));
+            int wait = (int) Math.max(50, deadline - System.currentTimeMillis());
+            Map response = cb.getResponseAndWait(wait);
             if (response != null) {
-                last.set(response);
+                last = response;
                 if (expectedStatus.equals(response.get("status"))) {
                     return response;
                 }
@@ -153,6 +152,6 @@ public class BluetoothEmulatorEndToEndTest {
             Thread.sleep(20);
         }
         throw new AssertionError("never observed status=" + expectedStatus + " within "
-                + timeoutMs + "ms; last response=" + last.get());
+                + timeoutMs + "ms; last response=" + last);
     }
 }
