@@ -3,12 +3,7 @@
 # End-to-end Android instrumentation test driving the BluetoothNativeBridge
 # against a Python Bumble peripheral acting as a virtual GATT server.
 #
-# Prerequisites:
-#   - Python 3.10+ with the `bumble` package installed (pip install bumble)
-#   - An Android emulator with the netsim virtual radio backend running.
-#     The reactivecircus/android-emulator-runner action launches one
-#     automatically when the emulator binary supports netsim (API 33+).
-#   - Standard env: JAVA_HOME, ANDROID_SDK_ROOT, CN1 build client jar.
+# Order of operations matters — see comments at each step.
 #
 set -euo pipefail
 
@@ -19,49 +14,14 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 is required" >&2
   exit 1
 fi
-
 if ! python3 -c "import bumble" 2>/dev/null; then
   echo "Python 'bumble' package is missing. Install with: pip install bumble" >&2
   exit 1
 fi
 
-PERIPHERAL_LOG="${PERIPHERAL_LOG:-$(mktemp -t bumble-peripheral.XXXXXX).log}"
-echo "Starting Bumble peripheral; logs at $PERIPHERAL_LOG"
-
-# Surface the transport choice so users can override it (eg android-emulator,
-# tcp-server:127.0.0.1:9000). Default targets the netsim daemon spawned by
-# modern Android emulators.
-export BUMBLE_TRANSPORT="${BUMBLE_TRANSPORT:-android-netsim}"
-# Bumble's logging is fairly quiet at INFO; turn up to DEBUG when iterating
-# in CI so we can diagnose connection / advertise problems.
-export BUMBLE_LOG_LEVEL="${BUMBLE_LOG_LEVEL:-DEBUG}"
-
-# Surface what netsim is exposing — useful to confirm the emulator side of
-# the link is up before Bumble tries to attach.
-echo "--- netsim CLI status (if available) ---"
-if command -v netsim >/dev/null 2>&1; then
-  netsim version || true
-  netsim devices || true
-elif [[ -x "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" ]]; then
-  "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" version || true
-  "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" devices || true
-else
-  echo "(netsim CLI not found; skipping)"
-fi
-echo "--- adb devices ---"
-adb devices -l || true
-
-# Bumble at DEBUG is verbose. Silence stdout to a file only — no inline
-# tail — to avoid stealing CPU/disk during the heavy Maven phase. The
-# cleanup dump prints the tail on failure.
-python3 "$ROOT_DIR/scripts/native-tests/bumble_peripheral.py" >"$PERIPHERAL_LOG" 2>&1 &
-PERIPHERAL_PID=$!
-
-# Background logcat capture, FILTERED to library + framework tags we
-# actually care about. Capturing the full firehose was generating tens of
-# MBs/min on a runner already pushing the memory ceiling and contributed
-# to system_server "Lost network stack" cascades during gradle's APK
-# install phase.
+# Filtered background logcat. Capturing the full firehose contributed to
+# system_server "Lost network stack" cascades during gradle's APK install
+# phase by overloading the runner.
 LOGCAT_LOG="${LOGCAT_LOG:-$(mktemp -t logcat.XXXXXX).log}"
 adb logcat -c 2>/dev/null || true
 ( adb logcat -v threadtime \
@@ -78,8 +38,11 @@ adb logcat -c 2>/dev/null || true
     > "$LOGCAT_LOG" 2>&1 ) &
 LOGCAT_PID=$!
 
+PERIPHERAL_LOG="${PERIPHERAL_LOG:-$(mktemp -t bumble-peripheral.XXXXXX).log}"
+PERIPHERAL_PID=
+
 cleanup() {
-  if kill -0 "${PERIPHERAL_PID:-0}" 2>/dev/null; then
+  if [[ -n "${PERIPHERAL_PID:-}" ]] && kill -0 "$PERIPHERAL_PID" 2>/dev/null; then
     kill "$PERIPHERAL_PID" 2>/dev/null || true
     wait "$PERIPHERAL_PID" 2>/dev/null || true
   fi
@@ -97,36 +60,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Give the peripheral a moment to attach and start advertising before the
-# emulator scans. Bumble emits "advertising as ..." once ready.
-for _ in $(seq 1 60); do
-  if grep -q "advertising as" "$PERIPHERAL_LOG" 2>/dev/null; then
-    break
-  fi
-  if ! kill -0 "$PERIPHERAL_PID" 2>/dev/null; then
-    echo "Bumble peripheral exited before it began advertising" >&2
-    exit 1
-  fi
-  sleep 1
-done
+# Step 1: Enable Bluetooth on the emulator BEFORE Bumble attaches.
+# Theory under test: Bumble's HCI_RESET on attach was racing with the
+# emulator BT stack startup, leaving the BT system service "not connected"
+# even though mEnable=true. Bring up the emulator side first, confirm
+# state=ON, then attach Bumble.
+echo "--- Step 1: enabling emulator-side Bluetooth ---"
+adb devices -l || true
 
-if ! grep -q "advertising as" "$PERIPHERAL_LOG"; then
-  echo "Bumble peripheral never reported readiness" >&2
-  exit 1
-fi
-
-echo "Bumble peripheral ready; verifying it shows up on netsim before instrumentation"
-if command -v netsim >/dev/null 2>&1; then
-  netsim devices || true
-elif [[ -x "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" ]]; then
-  "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" devices || true
-fi
-
-# Pre-enable Bluetooth on the AVD and poll until the adapter actually
-# reports state=ON. Without polling we have observed netsim-backed BT
-# bounce between ON and OFF for ~15s after `svc bluetooth enable` reports
-# "Success", which causes the plugin's initialize() to read status=disabled.
-echo "--- Pre-enabling Bluetooth on the emulator ---"
 bt_state() {
   adb shell dumpsys bluetooth_manager 2>/dev/null \
     | awk '/^\s*state:/ {print $2; exit}' \
@@ -139,15 +80,73 @@ for attempt in $(seq 1 6); do
     break
   fi
   adb shell svc bluetooth enable 2>&1 || true
-  # Stabilization wait — netsim-backed BT can flap for several seconds.
   sleep 8
 done
 final=$(bt_state || echo UNKNOWN)
 echo "Final bt_state=$final"
 if [[ "$final" != "ON" ]]; then
-  echo "Bluetooth never reached ON state on the emulator — instrumentation will fail" >&2
-  adb shell dumpsys bluetooth_manager 2>&1 | head -40 >&2 || true
+  echo "Bluetooth never reached ON state on the emulator." >&2
+  echo "--- bluetooth_manager dumpsys ---" >&2
+  adb shell dumpsys bluetooth_manager 2>&1 | head -60 >&2 || true
+  echo "--- emulator BT process ---" >&2
+  adb shell ps -A 2>&1 | grep -i blue || true
+  exit 1
 fi
 
-echo "Running instrumentation suite with E2E test"
+# Step 2: Now that the emulator BT controller is up, attach Bumble as a
+# virtual peripheral via netsim.
+echo "--- Step 2: starting Bumble peripheral ---"
+echo "--- netsim CLI status (if available) ---"
+NETSIM_BIN=""
+if command -v netsim >/dev/null 2>&1; then
+  NETSIM_BIN="netsim"
+elif [[ -x "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" ]]; then
+  NETSIM_BIN="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim"
+fi
+if [[ -n "$NETSIM_BIN" ]]; then
+  "$NETSIM_BIN" version || true
+  "$NETSIM_BIN" devices || true
+else
+  echo "(netsim CLI not found; skipping)"
+fi
+
+export BUMBLE_TRANSPORT="${BUMBLE_TRANSPORT:-android-netsim}"
+export BUMBLE_LOG_LEVEL="${BUMBLE_LOG_LEVEL:-DEBUG}"
+echo "Starting Bumble (transport=$BUMBLE_TRANSPORT); logs at $PERIPHERAL_LOG"
+python3 "$ROOT_DIR/scripts/native-tests/bumble_peripheral.py" >"$PERIPHERAL_LOG" 2>&1 &
+PERIPHERAL_PID=$!
+
+for _ in $(seq 1 60); do
+  if grep -q "advertising as" "$PERIPHERAL_LOG" 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$PERIPHERAL_PID" 2>/dev/null; then
+    echo "Bumble peripheral exited before it began advertising" >&2
+    exit 1
+  fi
+  sleep 1
+done
+if ! grep -q "advertising as" "$PERIPHERAL_LOG"; then
+  echo "Bumble peripheral never reported readiness" >&2
+  exit 1
+fi
+
+# Step 3: Re-check that the emulator BT is still ON after Bumble attached.
+# If Bumble's HCI reset took down the emulator's controller, surface that
+# clearly instead of letting the test fail with a confusing "scan never
+# returned a result".
+post_bumble=$(bt_state || echo UNKNOWN)
+echo "Post-Bumble bt_state=$post_bumble"
+if [[ "$post_bumble" != "ON" ]]; then
+  echo "Bluetooth dropped to $post_bumble after Bumble attached — Bumble's HCI reset trampled the emulator side." >&2
+  exit 1
+fi
+
+if [[ -n "$NETSIM_BIN" ]]; then
+  echo "--- netsim devices after Bumble attached ---"
+  "$NETSIM_BIN" devices || true
+fi
+
+# Step 4: Run instrumentation.
+echo "--- Step 3: running instrumentation suite with E2E test ---"
 BUMBLE_PERIPHERAL=1 "$ROOT_DIR/scripts/native-tests/run-android-native-tests.sh"
