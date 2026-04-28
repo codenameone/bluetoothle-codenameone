@@ -1,8 +1,18 @@
 name: Device Test
 
 # Layer 3 (real Android end-to-end against an actual GATT peripheral) for
-# this library. The Bumble + netsim emulator path is fundamentally broken
-# on GitHub-hosted runners (BT system service won't bind), so we instead
+# this library.
+#
+# Required repository secret: DEVICE_TEST_PAT
+#   Fine-grained personal access token scoped to this repository with
+#   "Checks: Read and write" permission. ${{ secrets.GITHUB_TOKEN }} is
+#   per-job and expires when build-and-notify ends (~3 min), well before
+#   the maintainer has a chance to install and run the APK on their
+#   phone. The PAT lives long enough for the maintainer to actually do
+#   the install.
+#
+# The Bumble + netsim emulator path is fundamentally broken on
+# GitHub-hosted runners (BT system service won't bind), so we instead
 # build a freshly-injected APK per CI run and ship it to the maintainer's
 # real Android device, which:
 #   - acts as a BLE peripheral in-process (BluetoothLeAdvertiser +
@@ -113,11 +123,23 @@ jobs:
           mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
 
       - name: Inject DeviceTestRunner into the generated project
+        # ${{ secrets.GITHUB_TOKEN }} is per-job and expires the moment
+        # build-and-notify finishes (~3 minutes), well before the
+        # maintainer has time to install + run the APK. By the time the
+        # device tries to PATCH the check-run we'd see HTTP 401 "Bad
+        # credentials". Use a long-lived fine-grained PAT stored as
+        # DEVICE_TEST_PAT instead — see the workflow's repository
+        # secrets docs at the top of this file.
         env:
-          GITHUB_TOKEN_FOR_DEVICE: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN_FOR_DEVICE: ${{ secrets.DEVICE_TEST_PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_CHECK_RUN_ID: ${{ steps.create_check.outputs.check_run_id }}
-        run: ./scripts/device-tests/inject-device-test.sh
+        run: |
+          if [[ -z "${GITHUB_TOKEN_FOR_DEVICE:-}" ]]; then
+            echo "::error::DEVICE_TEST_PAT secret is not set. Create a fine-grained PAT with 'Checks: Read and write' on this repo and save it as a repository secret named DEVICE_TEST_PAT. See scripts/device-tests/keystore/README.md for context."
+            exit 1
+          fi
+          ./scripts/device-tests/inject-device-test.sh
 
       - name: Build debug APK
         # CN1's generated gradle wrapper / Android Gradle Plugin is older

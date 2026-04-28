@@ -120,13 +120,33 @@ each PR/push it:
 
 The maintainer's task on each CI run:
 - Download the APK from the workflow run.
-- `adb install` and launch (or sideload).
+- `adb install -r` and launch (or sideload).
 - Grant the Bluetooth permission prompt on first launch.
 
 That's it. The test runs on its own and PATCHes the check run with the
 result, which resolves the PR's "device-test (real-hardware)" check
 automatically. A watchdog job times the check out after 2h if no device
 result is reported, so unrun PRs don't sit pending indefinitely.
+
+### One-time setup
+
+The workflow needs two pieces of static state in the repo:
+
+1. **`DEVICE_TEST_PAT` repository secret** — a fine-grained personal
+   access token scoped to this repository with "Checks: Read and write"
+   permission. `${{ secrets.GITHUB_TOKEN }}` is per-job and dies when
+   `build-and-notify` ends (~3 minutes), well before the maintainer has
+   time to install and run the APK; the PAT lives long enough for the
+   real human-in-the-loop install step.
+2. **`scripts/device-tests/keystore/device-test.keystore`** — a
+   committed, intentionally-public debug keystore so every CI build is
+   signed with the same cert. Without this, `adb install -r` rejects
+   each new APK with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because the
+   debug cert differs across runners. See the keystore directory's
+   README for why this is safe.
+
+If the device sees an HTTP 401 on the check-run PATCH, the PAT secret is
+missing, expired, or lacks the Checks permission.
 
 ### Why not Bumble + netsim?
 

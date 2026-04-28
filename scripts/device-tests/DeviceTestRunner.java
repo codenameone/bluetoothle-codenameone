@@ -199,7 +199,22 @@ public class DeviceTestRunner {
                 text.setPadding(24, 24, 24, 24);
                 text.setMovementMethod(new ScrollingMovementMethod());
                 text.setGravity(Gravity.TOP);
+                // Long-press to select & copy the transcript. Without this,
+                // there's no way to share the on-device log when the
+                // GitHub POST-back fails.
+                text.setTextIsSelectable(true);
                 text.setText(header + fullLog);
+                // Also drop the transcript into the clipboard immediately
+                // so the maintainer can paste it without scrolling.
+                try {
+                    android.content.ClipboardManager cm =
+                            (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText(
+                                "device-test transcript", header + fullLog));
+                    }
+                } catch (Throwable ignore) {
+                }
                 ScrollView scroll = new ScrollView(activity);
                 scroll.addView(text);
 
@@ -282,15 +297,14 @@ public class DeviceTestRunner {
     private static String drivCentral(Activity activity, Peripheral peripheral, PrintWriter log) throws Exception {
         Bluetooth bt = new Bluetooth();
 
-        BluetoothCallback initCb = new BluetoothCallback();
-        BluetoothCallbackRegistry.setMethodCallback("initialize", initCb);
+        // initialize is a *blocking* method on Bluetooth: it registers its
+        // own internal BluetoothCallback under "initialize" in the
+        // registry, calls the bridge, and waits for the callback. Manually
+        // pre-registering another callback under the same key (like an
+        // earlier version of this test did) loses to the internal one and
+        // never fires. Trust the boolean return.
         if (!bt.initialize(false, false, "device-test")) {
-            return "FAIL: bt.initialize dispatch returned false";
-        }
-        Map initResp = initCb.getResponseAndWait(5000);
-        if (initResp == null) return "FAIL: initialize callback never fired";
-        if (!"enabled".equals(initResp.get("status"))) {
-            return "FAIL: initialize returned status=" + initResp.get("status") + " (expected enabled)";
+            return "FAIL: bt.initialize returned false (BT not enabled, or platform unsupported)";
         }
         log.println("initialize OK");
 

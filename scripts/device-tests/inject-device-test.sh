@@ -93,6 +93,35 @@ add_permission "ACCESS_FINE_LOCATION"
 perl -0pi -e "s/compileSdkVersion\\s+0/compileSdkVersion 30/g; s/targetSdkVersion\\s+0/targetSdkVersion 30/g; s/buildToolsVersion\\s+'0'/buildToolsVersion '30.0.3'/g" "$APP_BUILD_GRADLE"
 perl -0pi -e "s/com\\.android\\.support:support-v4:0\\.\\+/com.android.support:support-v4:28.0.0/g; s/com\\.android\\.support:appcompat-v7:0\\.\\+/com.android.support:appcompat-v7:28.0.0/g" "$APP_BUILD_GRADLE"
 
+# 5b. Wire in the committed device-test keystore so every CI build
+# produces an APK signed by the same cert. Without this, each new APK
+# would have a different debug cert and `adb install -r` would reject
+# the upgrade with INSTALL_FAILED_UPDATE_INCOMPATIBLE, forcing the
+# maintainer to uninstall first.
+KEYSTORE_DEST="$ANDROID_SRC/app/device-test.keystore"
+cp "$ROOT_DIR/scripts/device-tests/keystore/device-test.keystore" "$KEYSTORE_DEST"
+if ! grep -q "device-test signing config" "$APP_BUILD_GRADLE"; then
+  cat >> "$APP_BUILD_GRADLE" <<'GRADLEEOF'
+
+// device-test signing config — committed keystore so reinstalls work
+android {
+    signingConfigs {
+        deviceTest {
+            storeFile file('device-test.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.deviceTest
+        }
+    }
+}
+GRADLEEOF
+fi
+
 # 6. Drop the legacy stale com/codename1/util JSON utils that the smoke
 # script also removes.
 LEGACY="$ANDROID_SRC/app/src/main/java/com/codename1/util"
