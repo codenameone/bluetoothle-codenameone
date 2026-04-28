@@ -36,11 +36,14 @@ jobs:
           curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
             -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
+      - name: Install Xvfb (CN1 TestRunner triggers AWT screen device init)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Install library artifacts locally
         run: mvn -DskipTests -Dcodename1.platform=javase install
 
       - name: Run BTDemo CN1 UnitTest suite against the JavaSE simulator
-        run: mvn -pl BTDemo cn1:test -Dcodename1.platform=javase
+        run: xvfb-run --auto-servernum mvn -pl BTDemo cn1:test -Dcodename1.platform=javase
 
       - name: Upload simulator JUnit reports
         if: always()
