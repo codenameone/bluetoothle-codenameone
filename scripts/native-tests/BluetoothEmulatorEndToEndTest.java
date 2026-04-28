@@ -83,15 +83,16 @@ public class BluetoothEmulatorEndToEndTest {
 
     @Test
     public void scanConnectReadWriteSubscribe() throws Exception {
-        // Bring the bridge up. initialize/enable are best-effort: emulator may
-        // already report enabled. If they fail, scan will surface the error.
+        // BT is pre-enabled by run-android-bumble-e2e.sh via `adb shell svc
+        // bluetooth enable` — initialize(request=false) just reports current
+        // state instead of triggering ACTION_REQUEST_ENABLE, which would
+        // block on a user dialog click that never comes in an instrumentation
+        // context.
         BluetoothCallback initCb = registerCallback("initialize");
-        assertTrue("initialize dispatch", bridge.initialize(true, false, "e2e"));
-        initCb.getResponseAndWait(5000);
-
-        BluetoothCallback enableCb = registerCallback("enable");
-        assertTrue("enable dispatch", bridge.enable());
-        enableCb.getResponseAndWait(5000);
+        assertTrue("initialize dispatch", bridge.initialize(false, false, "e2e"));
+        Map initResp = initCb.getResponseAndWait(5000);
+        assertNotNull("initialize must complete", initResp);
+        assertEquals("BT must be pre-enabled before this test", "enabled", initResp.get("status"));
 
         BluetoothCallback scanCb = registerCallback("startScan");
         assertTrue("startScan dispatch", bridge.startScan("", true, 0, 1, 1, 1));

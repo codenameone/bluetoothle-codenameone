@@ -122,5 +122,17 @@ elif [[ -x "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" ]]; then
   "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/emulator/netsim" devices || true
 fi
 
+# Pre-enable Bluetooth on the AVD: the plugin's initialize(request=true)
+# would otherwise launch ACTION_REQUEST_ENABLE (a system dialog) and the
+# instrumentation has no user to click "Allow", so the callback would
+# never fire. With BT already on, initialize() returns status=enabled
+# immediately.
+echo "--- Pre-enabling Bluetooth on the emulator ---"
+adb shell svc bluetooth enable 2>&1 || true
+# svc returns immediately; give the adapter a moment to finish toggling.
+sleep 3
+adb shell settings get global bluetooth_on 2>&1 || true
+adb shell dumpsys bluetooth_manager 2>&1 | grep -i "state\|enabled" | head -10 || true
+
 echo "Running instrumentation suite with E2E test"
 BUMBLE_PERIPHERAL=1 "$ROOT_DIR/scripts/native-tests/run-android-native-tests.sh"
