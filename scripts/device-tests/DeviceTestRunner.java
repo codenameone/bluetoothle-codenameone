@@ -273,11 +273,37 @@ public class DeviceTestRunner {
         log.println("=== cn1-bluetooth on-device test ===");
         log.println("Device: " + Build.MANUFACTURER + " " + Build.MODEL + " (Android " + Build.VERSION.RELEASE + ", API " + Build.VERSION.SDK_INT + ")");
 
+        // Surface system + permission state up-front so future failures
+        // self-diagnose without needing another debug round-trip.
+        for (String p : requiredPermissions()) {
+            int r = activity.checkSelfPermission(p);
+            log.println("perm " + p + " = "
+                    + (r == PackageManager.PERMISSION_GRANTED ? "GRANTED" : "DENIED"));
+        }
+        try {
+            android.location.LocationManager lm =
+                    (android.location.LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);
+            if (lm != null) {
+                boolean locEnabled;
+                if (Build.VERSION.SDK_INT >= 28) {
+                    locEnabled = lm.isLocationEnabled();
+                } else {
+                    locEnabled = lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+                            || lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+                }
+                log.println("system Location services = " + (locEnabled ? "ON" : "OFF"));
+            }
+        } catch (Throwable ignore) {
+        }
+
         BluetoothManager bm = (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
         BluetoothAdapter adapter = bm.getAdapter();
         if (adapter == null || !adapter.isEnabled()) {
             return "FAIL: Bluetooth must be enabled on the device before running this test";
         }
+        log.println("BluetoothAdapter enabled, scanner=" + (adapter.getBluetoothLeScanner() != null ? "ok" : "NULL")
+                + " advertiser=" + (adapter.getBluetoothLeAdvertiser() != null ? "ok" : "NULL"));
+
         BluetoothLeAdvertiser advertiser = adapter.getBluetoothLeAdvertiser();
         if (advertiser == null) {
             return "FAIL: device does not support BLE advertising";
@@ -591,7 +617,22 @@ public class DeviceTestRunner {
         private final AdvertiseCallback advCb = new AdvertiseCallback() {
             @Override
             public void onStartFailure(int errorCode) {
-                log.println("advertise start failed: " + errorCode);
+                String reason;
+                switch (errorCode) {
+                    case AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE: reason = "DATA_TOO_LARGE"; break;
+                    case AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS: reason = "TOO_MANY_ADVERTISERS"; break;
+                    case AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED: reason = "ALREADY_STARTED"; break;
+                    case AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR: reason = "INTERNAL_ERROR"; break;
+                    case AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED: reason = "FEATURE_UNSUPPORTED"; break;
+                    default: reason = "code=" + errorCode;
+                }
+                log.println("advertise start FAILED: " + reason);
+            }
+
+            @Override
+            public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+                log.println("advertise start OK txPower=" + settingsInEffect.getTxPowerLevel()
+                        + " mode=" + settingsInEffect.getMode());
             }
         };
 
