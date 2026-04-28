@@ -1,0 +1,97 @@
+name: Bumble Android E2E
+
+# End-to-end Android instrumentation test driving the BluetoothNativeBridge
+# against a Python Bumble peripheral attached to the emulator's netsim
+# virtual radio. This is the only layer that exercises real GATT round-trips
+# against a deterministic peripheral.
+#
+# Runs on a nightly schedule and on manual dispatch — NOT on every PR. The
+# Bumble<->emulator transport is fragile in the GitHub-hosted emulator
+# environment (system-process crash during instrumentation has been observed
+# even though netsim is active and Bumble is advertising). Putting it on
+# the PR critical path would gate library changes on infrastructure issues
+# unrelated to the library. A failure here still must be investigated and
+# fixed — it is not allowed to silently pass-through.
+
+on:
+  schedule:
+    # 03:17 UTC daily — late enough that nothing else is running, off the hour
+    # so we don't pile up with everyone else's cron jobs.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to test (defaults to default branch)'
+        required: false
+        type: string
+
+jobs:
+  android-bumble-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Java 17 (required for Android SDK cmdline tools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages required by CN1 Android source build
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-30" \
+            "build-tools;30.0.3"
+
+      - name: Set up Java 11 for Codename One build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p "$HOME/.codenameone"
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
+      - name: Install Bumble (virtual BLE peripheral)
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install bumble
+
+      - name: Run Android emulator + Bumble end-to-end tests
+        uses: ReactiveCircus/android-emulator-runner@v2
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          # -packet-streamer-endpoint enables netsim, the virtual radio backend
+          # Bumble attaches to via its android-netsim transport.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -packet-streamer-endpoint default
+          script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-bumble-e2e.sh
+
+      - name: Capture emulator logcat on failure
+        if: failure()
+        run: |
+          adb logcat -d > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bumble-e2e-diagnostics
+          path: |
+            ${{ runner.temp }}/logcat.txt
+            BTDemo/target/BTDemo-*-android-source/app/build/reports/androidTests/connected

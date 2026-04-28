@@ -92,13 +92,20 @@ What this layer does **not** catch:
 
 - End-to-end scan/connect/read/write against a real or virtual peripheral.
 
-## Layer 3 — Android end-to-end with Bumble virtual peripheral (`android-bumble-e2e-tests`)
+## Layer 3 — Android end-to-end with Bumble virtual peripheral (`bumble-e2e.yml`)
 
-The whole point of this layer is to surface regressions in the native
-Android code, so the job is required: failures gate the PR. If the
-Bumble↔emulator transport turns out to be unstable in CI, fix the cause
-or remove the job — don't let it pass-through with `continue-on-error`,
-which would silently mask real Android regressions.
+Lives in a separate workflow that runs on a nightly schedule and on manual
+dispatch — **not** on every PR. The Bumble↔emulator transport on
+GitHub-hosted runners is fragile (system-process crash during instrumentation
+has been observed even though netsim is active and Bumble is advertising),
+so putting it on the PR critical path would gate library changes on
+infrastructure issues unrelated to the library.
+
+Failures here still must be investigated and fixed — there is no
+`continue-on-error`. The job uploads `adb logcat` and the Android test
+report as artifacts on failure to make diagnosis tractable. Trigger
+manually from the Actions tab via `workflow_dispatch` against any branch
+when iterating on Android-side changes.
 
 A Python [Bumble](https://google.github.io/bumble/) peripheral
 (`scripts/native-tests/bumble_peripheral.py`) attaches to the emulator's
