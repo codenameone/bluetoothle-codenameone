@@ -15,6 +15,43 @@ on:
       - '**/*.md'
 
 jobs:
+  simulator-tests:
+    # Fast, hardware-free behavioral coverage of the public Bluetooth API,
+    # backed by the JavaSE simulator (BluetoothNativeBridgeImpl). Runs the
+    # CN1 UnitTest suite via mvn cn1:test; this is the workhorse and gates
+    # most regressions before the heavier native jobs even start.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p "$HOME/.codenameone"
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
+      - name: Install Xvfb (CN1 TestRunner triggers AWT screen device init)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Install library artifacts locally
+        run: mvn -DskipTests -Dcodename1.platform=javase install
+
+      - name: Run BTDemo CN1 UnitTest suite against the JavaSE simulator
+        run: xvfb-run --auto-servernum mvn -pl BTDemo cn1:test -Dcodename1.platform=javase
+
+      - name: Upload simulator JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-junit-reports
+          path: BTDemo/target/cn1-reports
+
   ios-native-tests:
     runs-on: macos-14
     steps:
@@ -91,3 +128,14 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-native-tests.sh
+
+# Layer 3 (real Android end-to-end against an actual GATT peripheral) lives
+# in .github/workflows/device-test.yml. We tried Bumble + netsim on hosted
+# runners and proved empirically that BT cannot be enabled there
+# (mEnable=true / state=OFF / "Bluetooth Service not connected") regardless
+# of AVD config, so the device-test workflow targets a real Android device
+# (the maintainer's phone) instead. The Bumble script
+# (scripts/native-tests/run-android-bumble-e2e.sh + bumble_peripheral.py +
+# BluetoothEmulatorEndToEndTest.java) stays in the repo for use on a
+# self-hosted runner with real BT, or for future re-evaluation if the
+# emulator+netsim path becomes viable.

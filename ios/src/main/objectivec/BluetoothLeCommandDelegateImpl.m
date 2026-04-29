@@ -72,19 +72,32 @@
     BOOL keepCallback = [result.keepCallback boolValue];
     NSString* argumentsAsJSON = [result argumentsAsJSON];
     BOOL debug = NO;
-    
+
 #ifdef DEBUG
     debug = YES;
 #endif
 
     //[self evalJsHelper:js];
     NSLog(@"Result %@", argumentsAsJSON);
-    com_codename1_bluetoothle_BluetoothCallbackRegistry_sendResult___java_lang_String_java_lang_String(
-        CN1_THREAD_GET_STATE_PASS_ARG 
+    // Honor pluginResult's status + keepCallback. The 2-argument
+    // BluetoothCallbackRegistry.sendResult defaults to success=true,
+    // keepCallback=false, which silently drops the callback after the
+    // first event delivered through this path — same root-cause bug as
+    // CallbackContext.sendPluginResult on Android. Use the 4-argument
+    // overload so multi-event operations (startScan -> scanStarted then
+    // scanResult, subscribe -> subscribed then subscribedResult,
+    // connect -> connected then disconnected, etc) actually deliver
+    // every event to the user's listener.
+    // CDVCommandStatus_OK == 1 in Cordova; matches PluginResult.Status.OK.ordinal()
+    // on the Android side.
+    com_codename1_bluetoothle_BluetoothCallbackRegistry_sendResult___java_lang_String_java_lang_String_boolean_boolean(
+        CN1_THREAD_GET_STATE_PASS_ARG
         fromNSString(CN1_THREAD_GET_STATE_PASS_ARG callbackId),
-        fromNSString(CN1_THREAD_GET_STATE_PASS_ARG argumentsAsJSON)
+        fromNSString(CN1_THREAD_GET_STATE_PASS_ARG argumentsAsJSON),
+        (status == 1) ? JAVA_TRUE : JAVA_FALSE,
+        keepCallback ? JAVA_TRUE : JAVA_FALSE
     );
-    
+
 }
 
 - (void)evalJs:(NSString*)js
