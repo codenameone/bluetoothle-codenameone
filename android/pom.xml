@@ -4,11 +4,11 @@
   <parent>
       <groupId>com.codenameone</groupId>
       <artifactId>cn1-bluetooth</artifactId>
-      <version>1.0.1</version>
+      <version>1.0.2</version>
   </parent>
   <groupId>com.codenameone</groupId>
   <artifactId>cn1-bluetooth-android</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
 
   <name>cn1-bluetooth-android</name>
   <build>
