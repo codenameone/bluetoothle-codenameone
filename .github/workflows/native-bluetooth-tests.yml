@@ -24,26 +24,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java 11
+      - name: Build + install CN1 8.0-SNAPSHOT framework
+        uses: ./.github/actions/setup-cn1-framework
+
+      - name: Set up Java 11 for cn1lib build + simulator runtime
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
 
-      - name: Setup Codename One Build Client
-        run: |
-          mkdir -p "$HOME/.codenameone"
-          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
-            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-
       - name: Install Xvfb (CN1 TestRunner triggers AWT screen device init)
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
-      - name: Install library artifacts locally
-        run: mvn -DskipTests -Dcodename1.platform=javase install
+      - name: Install cn1lib artifacts locally
+        run: mvn -B -DskipTests -Dcodename1.platform=javase install
 
       - name: Run BTDemo CN1 UnitTest suite against the JavaSE simulator
-        run: xvfb-run --auto-servernum mvn -pl BTDemo cn1:test -Dcodename1.platform=javase
+        run: xvfb-run --auto-servernum mvn -B -pl BTDemo cn1:test -Dcodename1.platform=javase
 
       - name: Upload simulator JUnit reports
         if: always()
@@ -57,17 +54,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java 11
+      - name: Build + install CN1 8.0-SNAPSHOT framework
+        uses: ./.github/actions/setup-cn1-framework
+
+      - name: Set up Java 11 for cn1lib build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
-
-      - name: Setup Codename One Build Client
-        run: |
-          mkdir -p "$HOME/.codenameone"
-          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
-            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
       - name: Verify Cordova references are removed
         run: |
@@ -100,17 +94,14 @@ jobs:
             "platforms;android-30" \
             "build-tools;30.0.3"
 
-      - name: Set up Java 11 for Codename One build
+      - name: Build + install CN1 8.0-SNAPSHOT framework
+        uses: ./.github/actions/setup-cn1-framework
+
+      - name: Set up Java 11 for cn1lib build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
-
-      - name: Setup Codename One Build Client
-        run: |
-          mkdir -p "$HOME/.codenameone"
-          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
-            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
       - name: Verify Cordova references are removed
         run: |
@@ -128,6 +119,62 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-native-tests.sh
+
+  native-ble-helper:
+    # Compile-and-smoke coverage for the desktop NativeBleBackend on macOS,
+    # Linux and Windows. Hosted runners typically don't expose a Bluetooth
+    # adapter, so we cannot exercise real BLE I/O — what we verify is:
+    #   1. The Rust helper builds with the runner's stable toolchain.
+    #   2. The matching Maven profile packages it under
+    #      com/codename1/bluetoothle/native/<os>/ inside cn1-bluetooth-javase-*.jar.
+    #   3. The helper starts, emits a `stateChanged` event (most likely
+    #      `unsupported` on a runner with no adapter, or `poweredOn` if one
+    #      somehow surfaces), and exits cleanly on shutdown.
+    # Physical scan/connect/read/write coverage lives in maintainer-driven
+    # workflows triggered on real hardware (see scripts/native-tests/).
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install BlueZ headers (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Build + install CN1 8.0-SNAPSHOT framework
+        uses: ./.github/actions/setup-cn1-framework
+
+      - name: Set up Java 11 for cn1lib build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Build cn1lib (triggers OS-matching native-ble-helper profile)
+        shell: bash
+        run: mvn -B -DskipTests -Dcodename1.platform=javase install
+
+      - name: Verify helper binary was packaged into the javase jar
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            macOS)   PATTERN='^com/codename1/bluetoothle/native/macos/cn1-ble-helper$' ;;
+            Linux)   PATTERN='^com/codename1/bluetoothle/native/linux/cn1-ble-helper$' ;;
+            Windows) PATTERN='^com/codename1/bluetoothle/native/windows/cn1-ble-helper\.exe$' ;;
+          esac
+          jar tf javase/target/cn1-bluetooth-javase-*.jar | grep -qE "$PATTERN"
+
+      - name: Smoke-test helper executable
+        shell: bash
+        run: ./scripts/native-tests/run-native-ble-helper-smoke.sh
 
 # Layer 3 (real Android end-to-end against an actual GATT peripheral) lives
 # in .github/workflows/device-test.yml. We tried Bumble + netsim on hosted

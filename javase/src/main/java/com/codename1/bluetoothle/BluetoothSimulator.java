@@ -47,6 +47,27 @@ public final class BluetoothSimulator {
         state.clearPeripherals();
     }
 
+    /// Number of peripherals currently registered with the simulator. Useful
+    /// for tests asserting the effect of [#addPeripheral] / [#clearPeripherals].
+    public static int registeredPeripheralCount() {
+        return state.snapshotPeripherals().size();
+    }
+
+    /// Whether a peripheral with the given MAC-style address is registered
+    /// (case-insensitive). Lets tests avoid running a scan just to check
+    /// whether [#addPeripheral] landed.
+    public static boolean isPeripheralRegistered(String address) {
+        if (address == null) {
+            return false;
+        }
+        for (SimulatedPeripheral p : state.snapshotPeripherals()) {
+            if (address.equalsIgnoreCase(p.getAddress())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// When true, the simulator behaves as if the user has already toggled
     /// Bluetooth on. When false, [Bluetooth#isEnabled()] returns false and
     /// most operations fail with an `isDisabled` error until [Bluetooth#enable()]

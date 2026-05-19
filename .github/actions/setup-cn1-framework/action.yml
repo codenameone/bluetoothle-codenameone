@@ -1,0 +1,74 @@
+name: 'Setup Codename One framework'
+description: >
+  Clones codenameone/CodenameOne (master) and codenameone/cn1-binaries, then
+  installs the 8.0-SNAPSHOT framework artifacts into the local ~/.m2 cache.
+  The cn1lib at this version depends on framework features (SimulatorHookLoader,
+  CoreBluetooth backend support) that have not been released yet, so CI must
+  build the framework from source on every run that doesn't hit the cache.
+
+inputs:
+  cn1-ref:
+    description: 'Git ref of codenameone/CodenameOne to build (branch/tag/sha).'
+    required: false
+    default: 'master'
+
+runs:
+  using: composite
+  steps:
+    - name: Restore CN1 framework cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository/com/codenameone
+        # Bumping cn1-cache-version invalidates every cached framework.
+        # Use that lever when CN1 master makes an incompatible change.
+        key: cn1-framework-v1-${{ runner.os }}-${{ inputs.cn1-ref }}-${{ hashFiles('.github/cn1-framework-pin.txt') }}
+        restore-keys: |
+          cn1-framework-v1-${{ runner.os }}-${{ inputs.cn1-ref }}-
+
+    - name: Set up JDK 8 for framework build
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '8'
+
+    - name: Clone CN1 + cn1-binaries
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        rm -rf /tmp/CodenameOne /tmp/cn1-binaries
+        git clone --depth 1 --branch "${{ inputs.cn1-ref }}" \
+          https://github.com/codenameone/CodenameOne.git /tmp/CodenameOne
+        git clone --depth 1 \
+          https://github.com/codenameone/cn1-binaries.git /tmp/cn1-binaries
+
+    - name: Install CN1 build client
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p "$HOME/.codenameone"
+        cp /tmp/CodenameOne/maven/CodeNameOneBuildClient.jar \
+           "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+
+    - name: Build + install CN1 framework artifacts
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: /tmp/CodenameOne/maven
+      run: |
+        set -euo pipefail
+        mvn -B -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+            -Plocal-dev-javase \
+            -Dcn1.binaries=/tmp/cn1-binaries \
+            install
+
+    - name: Report cache state
+      shell: bash
+      run: |
+        if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+          echo "CN1 framework restored from cache."
+        else
+          echo "CN1 framework built fresh."
+        fi
+        ls ~/.m2/repository/com/codenameone/ | head -20 || true
