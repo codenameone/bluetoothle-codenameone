@@ -30,9 +30,12 @@ mkdir -p BTDemo/target
 find BTDemo/target -maxdepth 1 -type d -name '*-android-source' -exec rm -rf {} +
 
 # Ensure all platform-specific reactor artifacts are installed locally before CN1 native-source generation.
-mvn -DskipTests -Dcodename1.platform=android install
+# -DskipNativeBleHelper=true: Android native tests don't exercise the
+# JavaSE Rust helper, and the Linux CI runner doesn't have libdbus-1-dev
+# installed (only the dedicated native-ble-helper job does).
+mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android install
 
-mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
+mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
 
 ANDROID_SRC="$(find BTDemo/target -maxdepth 1 -type d -name '*-android-source' | sort | tail -n 1)"
 if [[ -z "$ANDROID_SRC" ]]; then

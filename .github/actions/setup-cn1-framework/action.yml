@@ -10,7 +10,12 @@ inputs:
   cn1-ref:
     description: 'Git ref of codenameone/CodenameOne to build (branch/tag/sha).'
     required: false
-    default: 'master'
+    # TEMPORARY: while codenameone/CodenameOne#4988 is unmerged, this PR
+    # needs the SimulatorHookLoader classes which only exist on the
+    # framework PR's branch. Flip back to 'master' immediately after
+    # #4988 merges (delete the branch reference here in the same commit
+    # that lands this PR).
+    default: 'feat/simulator-menu-hooks'
 
 runs:
   using: composite
@@ -30,37 +35,45 @@ runs:
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/setup-java@v4
       with:
-        distribution: temurin
+        # Zulu instead of Temurin: Temurin ships no JDK 8 build for
+        # macos-14 (Apple Silicon), which makes the ios-native-tests and
+        # native-ble-helper macOS jobs fail their composite action with
+        # "Could not find satisfied version for SemVer '8'". Zulu has
+        # aarch64 JDK 8 binaries.
+        distribution: zulu
         java-version: '8'
 
     - name: Clone CN1 + cn1-binaries
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
+      # RUNNER_TEMP rather than /tmp so Windows runners — where Git Bash
+      # doesn't expose a usable Unix /tmp — get a real cross-platform
+      # workspace path.
       run: |
         set -euo pipefail
-        rm -rf /tmp/CodenameOne /tmp/cn1-binaries
+        rm -rf "$RUNNER_TEMP/CodenameOne" "$RUNNER_TEMP/cn1-binaries"
         git clone --depth 1 --branch "${{ inputs.cn1-ref }}" \
-          https://github.com/codenameone/CodenameOne.git /tmp/CodenameOne
+          https://github.com/codenameone/CodenameOne.git "$RUNNER_TEMP/CodenameOne"
         git clone --depth 1 \
-          https://github.com/codenameone/cn1-binaries.git /tmp/cn1-binaries
+          https://github.com/codenameone/cn1-binaries.git "$RUNNER_TEMP/cn1-binaries"
 
     - name: Install CN1 build client
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         mkdir -p "$HOME/.codenameone"
-        cp /tmp/CodenameOne/maven/CodeNameOneBuildClient.jar \
+        cp "$RUNNER_TEMP/CodenameOne/maven/CodeNameOneBuildClient.jar" \
            "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
     - name: Build + install CN1 framework artifacts
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      working-directory: /tmp/CodenameOne/maven
       run: |
         set -euo pipefail
+        cd "$RUNNER_TEMP/CodenameOne/maven"
         mvn -B -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
             -Plocal-dev-javase \
-            -Dcn1.binaries=/tmp/cn1-binaries \
+            -Dcn1.binaries="$RUNNER_TEMP/cn1-binaries" \
             install
 
     - name: Report cache state

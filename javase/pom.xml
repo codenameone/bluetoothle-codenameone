@@ -40,14 +40,19 @@
          WinRT on Windows). Each OS-activated profile builds the helper with cargo
          and copies it under the matching com/codename1/bluetoothle/native/<os>/
          resource folder so NativeBleBackend.helperResourcePath() can find it at
-         runtime. Builds on OSes other than these three (or where cargo is
-         missing) silently skip: NativeBleBackend.isAvailable() returns false and
+         runtime. CI jobs that don't need the helper (simulator-tests,
+         ios-native-tests, android-native-tests) pass
+         -DskipNativeBleHelper=true so the cargo build is skipped — useful
+         on runners that don't have cargo installed or, on Linux, lack the
+         libdbus-1-dev headers btleplug links against. When skipped,
+         NativeBleBackend.isAvailable() returns false at runtime and
          BluetoothNativeBridgeImpl falls back to the simulator. -->
 
     <profile>
       <id>macos-native-ble-helper</id>
       <activation>
         <os><family>mac</family></os>
+        <property><name>!skipNativeBleHelper</name></property>
       </activation>
       <build>
         <plugins>
@@ -87,6 +92,7 @@
       <id>linux-native-ble-helper</id>
       <activation>
         <os><family>unix</family><name>Linux</name></os>
+        <property><name>!skipNativeBleHelper</name></property>
       </activation>
       <build>
         <plugins>
@@ -126,6 +132,7 @@
       <id>windows-native-ble-helper</id>
       <activation>
         <os><family>windows</family></os>
+        <property><name>!skipNativeBleHelper</name></property>
       </activation>
       <build>
         <plugins>

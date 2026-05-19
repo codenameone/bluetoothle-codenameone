@@ -37,7 +37,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
       - name: Install cn1lib artifacts locally
-        run: mvn -B -DskipTests -Dcodename1.platform=javase install
+        # -DskipNativeBleHelper=true: simulator-tests exercise the in-memory
+        # backend, not the Rust helper, so we skip the cargo build (this
+        # runner doesn't have libdbus-1-dev or rust installed anyway).
+        run: mvn -B -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=javase install
 
       - name: Run BTDemo CN1 UnitTest suite against the JavaSE simulator
         run: xvfb-run --auto-servernum mvn -B -pl BTDemo cn1:test -Dcodename1.platform=javase

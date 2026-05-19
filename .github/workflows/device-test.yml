@@ -67,17 +67,14 @@ jobs:
             "platforms;android-30" \
             "build-tools;30.0.3"
 
+      - name: Build + install CN1 8.0-SNAPSHOT framework
+        uses: ./.github/actions/setup-cn1-framework
+
       - name: Set up Java 11 for Codename One build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
-
-      - name: Setup Codename One Build Client
-        run: |
-          mkdir -p "$HOME/.codenameone"
-          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
-            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
       - name: Resolve commit SHA for the check
         id: resolve_sha
@@ -114,8 +111,8 @@ jobs:
         run: |
           export JAVA_HOME="$JAVA_HOME_11_X64"
           export PATH="$JAVA_HOME/bin:$PATH"
-          mvn -DskipTests -Dcodename1.platform=android install
-          mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
+          mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android install
+          mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
 
       - name: Inject DeviceTestRunner into the generated project
         env:

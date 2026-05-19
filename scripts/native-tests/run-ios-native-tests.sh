@@ -34,9 +34,12 @@ mkdir -p BTDemo/target
 find BTDemo/target -maxdepth 1 -type d -name '*-ios-source' -exec rm -rf {} +
 
 # Ensure all platform-specific reactor artifacts are installed locally before CN1 native-source generation.
-mvn -DskipTests -Dcodename1.platform=ios install
+# -DskipNativeBleHelper=true: iOS native tests don't exercise the JavaSE
+# Rust helper, and we don't want to require cargo on CI runners that
+# only need the iOS toolchain.
+mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=ios install
 
-mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
+mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 
 IOS_SRC="$(find BTDemo/target -maxdepth 1 -type d -name '*-ios-source' | sort | tail -n 1)"
 if [[ -z "$IOS_SRC" ]]; then

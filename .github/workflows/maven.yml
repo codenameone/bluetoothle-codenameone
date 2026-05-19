@@ -29,4 +29,8 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
     - name: Build cn1lib
-      run: mvn -B install
+      # -DskipNativeBleHelper=true keeps this generic build green on the
+      # vanilla ubuntu-latest runner (no libdbus-1-dev, no cargo). The
+      # dedicated native-ble-helper matrix job in native-bluetooth-tests.yml
+      # is what actually verifies the helper builds + ships.
+      run: mvn -B -DskipNativeBleHelper=true install
