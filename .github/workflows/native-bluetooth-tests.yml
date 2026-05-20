@@ -57,6 +57,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install ripgrep
+        # macos-14 runner image doesn't ship ripgrep by default and
+        # run-ios-native-tests.sh uses `rg` for pbxproj edits + the
+        # Cordova guard. The Cordova guard was hiding this with `! rg ...`
+        # (command-not-found inverts to 0 = pass) but the pbxproj edits
+        # weren't applied silently, so xcodebuild later failed.
+        run: brew install ripgrep
+
       - name: Build + install CN1 8.0-SNAPSHOT framework
         uses: ./.github/actions/setup-cn1-framework
 

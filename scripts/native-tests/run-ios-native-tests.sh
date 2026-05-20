@@ -269,8 +269,17 @@ fi
 
 echo "Running iOS native tests in: $IOS_SIM_DESTINATION"
 
+# 8.0-SNAPSHOT cn1:build only generates BTDemo.xcodeproj — older versions
+# also produced a BTDemo.xcworkspace next to it. Fall back to the project
+# when the workspace is missing so the test step works across both.
+if [[ -d "$IOS_SRC/BTDemo.xcworkspace" ]]; then
+  XCBUILD_TARGET=(-workspace "$IOS_SRC/BTDemo.xcworkspace")
+else
+  XCBUILD_TARGET=(-project "$IOS_SRC/BTDemo.xcodeproj")
+fi
+
 xcodebuild \
-  -workspace "$IOS_SRC/BTDemo.xcworkspace" \
+  "${XCBUILD_TARGET[@]}" \
   -scheme BTDemoTests \
   -configuration Debug \
   -destination "$IOS_SIM_DESTINATION" \
