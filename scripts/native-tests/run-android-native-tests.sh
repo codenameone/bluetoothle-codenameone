@@ -306,9 +306,13 @@ if ! rg -q 'testInstrumentationRunner "android.support.test.runner.AndroidJUnitR
 fi
 
 TEST_DEP_CONF="androidTestImplementation"
-if ! rg -q "^[[:space:]]*implementation[[:space:]]" "$APP_BUILD_GRADLE"; then
-  TEST_DEP_CONF="androidTestCompile"
-fi
+# The previous behavior fell back to the Gradle 5-removed
+# "androidTestCompile" when the file didn't have any
+# top-level "implementation" line (which happens after the codegen pass
+# above rewrites every legacy "compile" / there were none to begin
+# with). Gradle 8 doesn't recognize that name and dies on the appended
+# block. The modern configuration always works on AGP 3.x+ where the
+# test runner library lives, so use it unconditionally.
 
 # Remove stale injected test dependency lines from previous runs.
 perl -ni -e 'print unless /(androidx\.test:(runner|ext:junit|espresso-core)|com\.android\.support\.test:(runner|rules|espresso-core))/' "$APP_BUILD_GRADLE"
