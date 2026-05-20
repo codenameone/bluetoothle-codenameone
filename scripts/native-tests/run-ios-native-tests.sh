@@ -292,9 +292,16 @@ else
   XCBUILD_TARGET=(-project "$IOS_SRC/BTDemo.xcodeproj")
 fi
 
+# Force-link CoreBluetooth into the test bundle. Across CN1 generator
+# versions the test target's Frameworks build phase has a different
+# PBXFileReference UUID, so the awk-driven pbxproj surgery above isn't
+# reliable on every release. Passing OTHER_LDFLAGS as an xcodebuild
+# build setting applies to the bundle being built (BTDemoTests) and is
+# version-independent.
 xcodebuild \
   "${XCBUILD_TARGET[@]}" \
   -scheme BTDemoTests \
   -configuration Debug \
   -destination "$IOS_SIM_DESTINATION" \
+  OTHER_LDFLAGS="\$(inherited) -framework CoreBluetooth" \
   test
