@@ -87,6 +87,15 @@ APP_GRADLE_PROPERTIES="$ANDROID_SRC/app/gradle.properties"
 
 perl -0pi -e "s/compileSdkVersion\\s+0/compileSdkVersion 30/g; s/targetSdkVersion\\s+0/targetSdkVersion 30/g; s/buildToolsVersion\\s+'0'/buildToolsVersion '30.0.3'/g" "$APP_BUILD_GRADLE"
 perl -0pi -e "s/com\\.android\\.support:support-v4:0\\.\\+/com.android.support:support-v4:28.0.0/g; s/com\\.android\\.support:appcompat-v7:0\\.\\+/com.android.support:appcompat-v7:28.0.0/g" "$APP_BUILD_GRADLE"
+# CN1 master's Android codegen still emits Gradle 5-removed
+# androidTestCompile / testCompile / compile dependency configurations.
+# Gradle 8 (which the emulator-runner step uses) refuses them and the
+# build dies on `app/build.gradle` line 97 with "Could not find method
+# androidTestCompile() ...". Rename to the modern equivalents on the
+# generated file before running the emulator. Pin to a leading
+# whitespace + identifier match so we don't touch coincidental
+# substrings elsewhere in the file.
+perl -0pi -e "s/^(\\s+)androidTestCompile(\\s|\\()/\$1androidTestImplementation\$2/gm; s/^(\\s+)testCompile(\\s|\\()/\$1testImplementation\$2/gm; s/^(\\s+)compile(\\s|\\()/\$1implementation\$2/gm" "$APP_BUILD_GRADLE"
 
 TEST_DIR="$ANDROID_SRC/app/src/androidTest/java/com/codename1/btle"
 TEST_FILE="$TEST_DIR/BluetoothNativeInstrumentationTest.java"
