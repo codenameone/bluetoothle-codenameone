@@ -85,6 +85,18 @@ ensure_gradle_property() {
 GRADLE_PROPERTIES="$ANDROID_SRC/gradle.properties"
 APP_GRADLE_PROPERTIES="$ANDROID_SRC/app/gradle.properties"
 
+# Enable AndroidX + Jetifier in the generated project. The script
+# injects androidx.test deps for the instrumentation test, and the
+# generated project still pulls in old com.android.support:* libs;
+# Jetifier transparently rewrites the legacy ones at build time so
+# they coexist with the AndroidX test runner.
+if ! grep -q "^android.useAndroidX=true" "$GRADLE_PROPERTIES" 2>/dev/null; then
+  echo "android.useAndroidX=true" >> "$GRADLE_PROPERTIES"
+fi
+if ! grep -q "^android.enableJetifier=true" "$GRADLE_PROPERTIES" 2>/dev/null; then
+  echo "android.enableJetifier=true" >> "$GRADLE_PROPERTIES"
+fi
+
 perl -0pi -e "s/compileSdkVersion\\s+0/compileSdkVersion 30/g; s/targetSdkVersion\\s+0/targetSdkVersion 30/g; s/buildToolsVersion\\s+'0'/buildToolsVersion '30.0.3'/g" "$APP_BUILD_GRADLE"
 perl -0pi -e "s/com\\.android\\.support:support-v4:0\\.\\+/com.android.support:support-v4:28.0.0/g; s/com\\.android\\.support:appcompat-v7:0\\.\\+/com.android.support:appcompat-v7:28.0.0/g" "$APP_BUILD_GRADLE"
 # CN1 master's Android codegen still emits Gradle 5-removed
@@ -217,8 +229,8 @@ import com.codename1.bluetoothle.BluetoothCallback;
 import com.codename1.bluetoothle.BluetoothCallbackRegistry;
 import com.codename1.bluetoothle.BluetoothNativeBridgeImpl;
 
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -230,7 +242,7 @@ public class BluetoothNativeInstrumentationTest {
 
     @Test
     public void bluetoothStackIsAvailable() {
-        Context context = InstrumentationRegistry.getTargetContext();
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         BluetoothManager manager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
         assertNotNull("BluetoothManager should be available", manager);
 
@@ -291,13 +303,13 @@ if [[ -f "$EXAMPLE_TEST" ]]; then
   rm -f "$EXAMPLE_TEST"
 fi
 
-if ! rg -q 'testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"' "$APP_BUILD_GRADLE"; then
+if ! rg -q 'testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"' "$APP_BUILD_GRADLE"; then
   TMP_GRADLE="$(mktemp)"
   awk '
     {
       print
       if ($0 ~ /^[[:space:]]*defaultConfig[[:space:]]*\{[[:space:]]*$/ && !runnerInserted) {
-        print "        testInstrumentationRunner \"android.support.test.runner.AndroidJUnitRunner\""
+        print "        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\""
         runnerInserted = 1
       }
     }
@@ -317,11 +329,12 @@ TEST_DEP_CONF="androidTestImplementation"
 # Remove stale injected test dependency lines from previous runs.
 perl -ni -e 'print unless /(androidx\.test:(runner|ext:junit|espresso-core)|com\.android\.support\.test:(runner|rules|espresso-core))/' "$APP_BUILD_GRADLE"
 
-if ! rg -q "com\.android\.support\.test:runner" "$APP_BUILD_GRADLE"; then
+if ! rg -q "androidx\.test:runner" "$APP_BUILD_GRADLE"; then
   cat >> "$APP_BUILD_GRADLE" <<EOF
 
 dependencies {
-    $TEST_DEP_CONF "com.android.support.test:runner:1.0.2"
+    $TEST_DEP_CONF "androidx.test:runner:1.6.1"
+    $TEST_DEP_CONF "androidx.test.ext:junit:1.2.1"
 }
 EOF
 fi
