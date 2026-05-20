@@ -115,6 +115,9 @@ jobs:
           # no _X64 suffix); without it the step fails with
           # "must set the JAVA17_HOME environment variable".
           export JAVA17_HOME="$JAVA_HOME_17_X64"
+          # Bound the heap so the inner Maven Invoker fork inside cn1:build
+          # doesn't OOM in VM init on a memory-constrained runner.
+          export MAVEN_OPTS="-Xms256m -Xmx1g"
           export PATH="$JAVA_HOME/bin:$PATH"
           mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android install
           mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
