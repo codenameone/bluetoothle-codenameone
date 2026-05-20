@@ -21,16 +21,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build + install CN1 8.0-SNAPSHOT framework
-      uses: ./.github/actions/setup-cn1-framework
-    - name: Set up JDK 11 for cn1lib build
+    - name: Set up JDK 11
       uses: actions/setup-java@v4
       with:
         java-version: '11'
         distribution: 'temurin'
-    - name: Build cn1lib
-      # -DskipNativeBleHelper=true keeps this generic build green on the
-      # vanilla ubuntu-latest runner (no libdbus-1-dev, no cargo). The
-      # dedicated native-ble-helper matrix job in native-bluetooth-tests.yml
-      # is what actually verifies the helper builds + ships.
+    - name: Setup Codename One Build Client
+      run: |
+        mkdir -p ~/.codenameone
+        wget https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar -O ~/.codenameone/CodeNameOneBuildClient.jar
+    - name: Build with Maven
+      # -DskipNativeBleHelper=true skips the optional Rust helper build on
+      # this generic Linux job; the dedicated native-ble-helper matrix in
+      # native-bluetooth-tests.yml is what verifies it.
       run: mvn -B -DskipNativeBleHelper=true install

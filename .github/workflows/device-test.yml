@@ -67,14 +67,17 @@ jobs:
             "platforms;android-30" \
             "build-tools;30.0.3"
 
-      - name: Build + install CN1 8.0-SNAPSHOT framework
-        uses: ./.github/actions/setup-cn1-framework
-
       - name: Set up Java 11 for Codename One build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
+
+      - name: Setup Codename One Build Client
+        run: |
+          mkdir -p "$HOME/.codenameone"
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
 
       - name: Resolve commit SHA for the check
         id: resolve_sha

@@ -37,8 +37,8 @@
 
 
     <properties>
-        <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
-        <cn1.version>8.0-SNAPSHOT</cn1.version>
+        <cn1.plugin.version>7.0.243</cn1.plugin.version>
+        <cn1.version>7.0.243</cn1.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <java.version>1.8</java.version>
@@ -288,18 +288,6 @@
             <layout>default</layout>
             <snapshots>
                 <enabled>false</enabled>
-            </snapshots>
-        </repository>
-        <repository>
-            <id>local-snapshots</id>
-            <name>Local SNAPSHOT (m2)</name>
-            <url>file://${user.home}/.m2/repository</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
             </snapshots>
         </repository>
     </repositories>
