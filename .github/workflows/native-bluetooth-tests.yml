@@ -168,12 +168,30 @@ jobs:
       - name: Verify helper binary was packaged into the javase jar
         shell: bash
         run: |
+          set -euo pipefail
           case "${{ runner.os }}" in
             macOS)   PATTERN='^com/codename1/bluetoothle/native/macos/cn1-ble-helper$' ;;
             Linux)   PATTERN='^com/codename1/bluetoothle/native/linux/cn1-ble-helper$' ;;
             Windows) PATTERN='^com/codename1/bluetoothle/native/windows/cn1-ble-helper\.exe$' ;;
           esac
-          jar tf javase/target/cn1-bluetooth-javase-*.jar | grep -qE "$PATTERN"
+          # Filter out -sources / -javadoc classifiers — `cn1-bluetooth-javase-*.jar`
+          # would otherwise expand to three jars and `jar tf` would silently read
+          # only the first one (alphabetically the javadoc jar, which lacks the
+          # native helper resource), making this check fail spuriously.
+          JAR=$(ls javase/target/cn1-bluetooth-javase-*.jar 2>/dev/null \
+                  | grep -Ev -- '-(sources|javadoc)\.jar$' \
+                  | head -n1)
+          if [ -z "$JAR" ]; then
+            echo "No main javase jar found under javase/target." >&2
+            ls -la javase/target/ || true
+            exit 1
+          fi
+          echo "Inspecting $JAR for pattern: $PATTERN"
+          if ! jar tf "$JAR" | grep -qE "$PATTERN"; then
+            echo "Helper resource not found in jar. Contents (filtered):" >&2
+            jar tf "$JAR" | grep -E 'native|simulator-hooks' >&2 || true
+            exit 1
+          fi
 
       - name: Smoke-test helper executable
         shell: bash

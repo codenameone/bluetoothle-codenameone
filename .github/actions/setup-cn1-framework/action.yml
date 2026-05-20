@@ -58,12 +58,22 @@ runs:
           https://github.com/codenameone/cn1-binaries.git "$RUNNER_TEMP/cn1-binaries"
 
     - name: Install CN1 build client
-      if: steps.cache.outputs.cache-hit != 'true'
+      # Always run — the build client lives in ~/.codenameone, NOT under
+      # ~/.m2 where the framework cache restores to. Without this step
+      # cache-hit jobs fail with "CodeNameOneBuildClient.jar not found".
+      # When we just cloned the framework, copy from there; otherwise
+      # pull a fresh copy from GitHub.
       shell: bash
       run: |
+        set -euo pipefail
         mkdir -p "$HOME/.codenameone"
-        cp "$RUNNER_TEMP/CodenameOne/maven/CodeNameOneBuildClient.jar" \
-           "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+        if [ -f "$RUNNER_TEMP/CodenameOne/maven/CodeNameOneBuildClient.jar" ]; then
+          cp "$RUNNER_TEMP/CodenameOne/maven/CodeNameOneBuildClient.jar" \
+             "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+        else
+          curl -fsSL "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar" \
+            -o "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+        fi
 
     - name: Build + install CN1 framework artifacts
       if: steps.cache.outputs.cache-hit != 'true'
