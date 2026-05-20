@@ -647,23 +647,38 @@ async fn writer_loop(mut rx: mpsc::UnboundedReceiver<Value>) {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let manager = Manager::new().await?;
-    let adapters = manager.adapters().await?;
-    let Some(adapter) = adapters.into_iter().next() else {
-        // No adapter at all: emit an unsupported state so the Java side
-        // doesn't hang waiting on initialize completion, then idle.
-        let (tx, rx) = mpsc::unbounded_channel::<Value>();
-        emit_event(&tx, "stateChanged", json!({"state": "unsupported"}));
-        // Keep the helper alive so the parent's reader thread doesn't see an
-        // early EOF that looks like a crash. Drain stdin so a shutdown
-        // command or EOF still terminates us cleanly.
-        tokio::spawn(writer_loop(rx));
-        let stdin = tokio::io::stdin();
-        let mut reader = BufReader::new(stdin).lines();
-        loop {
-            match reader.next_line().await {
-                Ok(Some(_)) => continue,
-                _ => return Ok(()),
+    // Every "we can't get a working adapter" branch — no BlueZ on the host,
+    // permission denied, zero adapters — produces a stateChanged=unsupported
+    // event and idles instead of crashing. CI runners hit this all the time
+    // (no BT hardware); the smoke test treats receipt of *any* stateChanged
+    // as a success signal, so this keeps the helper's contract intact.
+    let adapter_result: Result<Adapter, Box<dyn std::error::Error>> = async {
+        let manager = Manager::new().await?;
+        let adapters = manager.adapters().await?;
+        adapters.into_iter().next()
+            .ok_or_else(|| "no adapters returned by btleplug".into())
+    }.await;
+
+    let adapter = match adapter_result {
+        Ok(a) => a,
+        Err(e) => {
+            let (tx, rx) = mpsc::unbounded_channel::<Value>();
+            tokio::spawn(writer_loop(rx));
+            // Surface the underlying reason on stderr for diagnostics, but
+            // the wire-side stateChanged is the only thing the Java side reads.
+            eprintln!("cn1-ble-helper: no usable adapter ({}); reporting unsupported", e);
+            emit_event(&tx, "stateChanged", json!({"state": "unsupported"}));
+            // Drain stdin so a shutdown command or EOF still terminates
+            // us cleanly. Tokio gives stdout a moment to flush via the
+            // sleep before we start reading.
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            let stdin = tokio::io::stdin();
+            let mut reader = BufReader::new(stdin).lines();
+            loop {
+                match reader.next_line().await {
+                    Ok(Some(_)) => continue,
+                    _ => return Ok(()),
+                }
             }
         }
     };

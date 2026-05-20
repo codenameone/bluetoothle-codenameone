@@ -121,7 +121,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: JAVA_HOME="$JAVA_HOME_11_X64" ./scripts/native-tests/run-android-native-tests.sh
+          script: JAVA_HOME="$JAVA_HOME_11_X64" JAVA17_HOME="$JAVA_HOME_17_X64" ./scripts/native-tests/run-android-native-tests.sh
 
   native-ble-helper:
     # Compile-and-smoke coverage for the desktop NativeBleBackend on macOS,

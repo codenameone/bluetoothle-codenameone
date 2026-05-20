@@ -110,6 +110,11 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME_11_X64 }}
         run: |
           export JAVA_HOME="$JAVA_HOME_11_X64"
+          # CN1's cn1:build for Android forks a Gradle 8 build which
+          # requires Java 17. The plugin reads JAVA17_HOME (uppercase,
+          # no _X64 suffix); without it the step fails with
+          # "must set the JAVA17_HOME environment variable".
+          export JAVA17_HOME="$JAVA_HOME_17_X64"
           export PATH="$JAVA_HOME/bin:$PATH"
           mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android install
           mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
