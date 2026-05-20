@@ -123,7 +123,13 @@ jobs:
           export MAVEN_OPTS="-Xms256m -Xmx1g"
           export PATH="$JAVA_HOME/bin:$PATH"
           mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android install
-          mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
+          # Use the fully-qualified plugin coordinate instead of the cn1:
+          # prefix. After the install step writes to the local m2 group
+          # metadata for com.codenameone, Maven can resolve the cn1
+          # prefix from the local cache without round-tripping to Central
+          # — and the local metadata may not list the codenameone-maven
+          # plugin's prefix, causing "No plugin found for prefix 'cn1'".
+          mvn -pl BTDemo -am com.codenameone:codenameone-maven-plugin:7.0.243:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
 
       - name: Inject DeviceTestRunner into the generated project
         env:
