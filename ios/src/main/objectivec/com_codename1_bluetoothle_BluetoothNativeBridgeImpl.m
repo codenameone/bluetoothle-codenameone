@@ -1,5 +1,9 @@
 #import <Foundation/Foundation.h>
 #import "com_codename1_bluetoothle_BluetoothNativeBridgeImpl.h"
+// Full plugin header lives here, not in the .h, so CoreBluetooth /
+// CoreLocation don't leak into the codegen shim that consumes the .h.
+// See the comment in the .h for the full rationale.
+#import "BluetoothLePlugin.h"
 #import "BluetoothLeCommandDelegateImpl.h"
 #import <objc/message.h>
 
