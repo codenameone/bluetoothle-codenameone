@@ -144,6 +144,20 @@ if [[ -f "$IOS_NATIVE_FILE" ]]; then
   perl -0pi -e 's/CN1_THREAD_STATE_MULTI_ARG instanceObject/CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject/g' "$IOS_NATIVE_FILE"
 fi
 
+# Cast `ptr` to the bridge type inside the CN1-generated dispatch shim.
+# The shim declares `ptr` as `id` and calls e.g. `[ptr requestLocation]`;
+# because the shim's own `#import`s pull in CoreLocation and
+# CoreBluetooth, clang sees both Apple's `-(void)requestLocation`
+# (CLLocationManager) / `-(void)stopScan` (CBCentralManager) and the
+# bridge's `-(BOOL)requestLocation` / `-(BOOL)stopScan` and picks the
+# void overload, failing with "initializing 'JAVA_BOOLEAN' with an
+# expression of incompatible type 'void'". Adding the cast forces
+# unambiguous selector resolution to the bridge's BOOL methods.
+CODEGEN_SHIM="$IOS_SRC/BTDemo-src/native_com_codename1_bluetoothle_BluetoothNativeBridgeImplCodenameOne.m"
+if [[ -f "$CODEGEN_SHIM" ]]; then
+  perl -0pi -e 's/\[ptr /[(com_codename1_bluetoothle_BluetoothNativeBridgeImpl*)ptr /g' "$CODEGEN_SHIM"
+fi
+
 if ! rg -q "BTDemoBluetoothNativeTests.m in Sources" "$PBXPROJ"; then
   TMP_PBXPROJ="$(mktemp)"
   awk '
