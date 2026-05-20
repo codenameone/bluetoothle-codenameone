@@ -93,6 +93,18 @@ public final class BluetoothSimulatorHooks {
     }
 
     /**
+     * Primes the simulator to fail the next read against the demo
+     * characteristic with a scripted "read" error. API-only hook (no menu
+     * label); used by CN1 UnitTests via
+     * {@code CN.executeHook("bluetooth:primeReadFailure")} to verify the
+     * cn1lib's error-propagation path without manipulating internal state
+     * from common/ test code.
+     */
+    public static void primeReadFailure() {
+        BluetoothSimulator.failNext("read", "read", "primed by test hook");
+    }
+
+    /**
      * Pushes a single notification on the demo peripheral's notify
      * characteristic. The byte value is a 1-byte rolling counter so repeated
      * triggers produce visibly different payloads on the receiving side.

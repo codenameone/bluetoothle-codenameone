@@ -1,98 +1,81 @@
 package com.codename1.btle;
 
+import com.codename1.bluetoothle.Bluetooth;
 import com.codename1.bluetoothle.BluetoothSimulator;
-import com.codename1.bluetoothle.BluetoothSimulatorHooks;
-import com.codename1.impl.javase.simulator.SimulatorHook;
-import com.codename1.impl.javase.simulator.SimulatorHookLoader;
 import com.codename1.testing.TestUtils;
+import com.codename1.ui.CN;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * End-to-end coverage for the cn1-bluetooth simulator hooks. Exercises:
+ * Exercises the cn1-bluetooth simulator hooks through the cross-platform
+ * {@link CN#executeHook} entry point — i.e., the same way a CN1 UnitTest
+ * living in a cn1-bluetooth-using app's {@code common/} project would
+ * drive them. The test imports nothing from the JavaSE port; if the
+ * file ever compiled against {@code com.codename1.impl.javase.*} that
+ * would be a regression.
  *
- * <ul>
- *   <li>the action methods on {@link BluetoothSimulatorHooks} directly,
- *   verifying they mutate {@link BluetoothSimulator} state in the way the
- *   menu would,</li>
- *   <li>that the framework's {@link SimulatorHookLoader} actually picks up
- *   this cn1lib's {@code META-INF/codenameone/simulator-hooks.properties}
- *   from the classpath and resolves each action method.</li>
- * </ul>
- *
- * The first set is what gives the menu items their meaning. The second is
- * what proves the menu would even appear when running BTDemo in the simulator.
+ * <p>Each hook covered here also has a corresponding manual menu item
+ * the developer can click, except {@code primeReadFailure}, which is
+ * declared label-less in {@code simulator-hooks.properties} (an API-only
+ * hook). That last test pins both the label-less branch of the
+ * framework loader and the failure-priming code path of the lib.</p>
  */
 public class BluetoothSimulatorHooksTest extends AbstractBluetoothSimulatorTest {
 
     @Override
     public boolean runTest() throws Exception {
-        verifyHooksDiscoveredFromClasspath();
+        verifyHooksAreRegisteredOnSimulator();
         verifyToggleAdapterFlipsState();
         verifyClearPeripheralsRemovesAll();
         verifyAddDemoPeripheralRegistersPeripheral();
         verifyDisconnectAllClosesActiveConnection();
         verifyPushDemoNotificationDeliversToSubscriber();
+        verifyApiOnlyHookPrimesScriptedFailure();
         return true;
     }
 
-    private void verifyHooksDiscoveredFromClasspath() {
-        List<SimulatorHook> hooks = SimulatorHookLoader.load();
-
-        int bluetoothItems = 0;
-        boolean sawToggle = false;
-        boolean sawAdd = false;
-        boolean sawDisconnect = false;
-        boolean sawPush = false;
-        boolean sawClear = false;
-        for (SimulatorHook h : hooks) {
-            if (!"Bluetooth".equals(h.getMenuName())) {
-                continue;
-            }
-            bluetoothItems++;
-            String label = h.getLabel();
-            if (label.startsWith("Toggle adapter")) sawToggle = true;
-            else if (label.startsWith("Add demo")) sawAdd = true;
-            else if (label.startsWith("Disconnect all")) sawDisconnect = true;
-            else if (label.startsWith("Push demo")) sawPush = true;
-            else if (label.startsWith("Clear")) sawClear = true;
-            TestUtils.assertNotNull(h.getInvoke(),
-                    "Bluetooth hook '" + label + "' has no resolved Runnable");
-        }
-        TestUtils.assertTrue(bluetoothItems >= 5,
-                "Expected at least 5 Bluetooth hooks but loader returned " + bluetoothItems);
-        TestUtils.assertTrue(sawToggle, "Toggle adapter hook missing");
-        TestUtils.assertTrue(sawAdd, "Add demo peripheral hook missing");
-        TestUtils.assertTrue(sawDisconnect, "Disconnect all hook missing");
-        TestUtils.assertTrue(sawPush, "Push demo notification hook missing");
-        TestUtils.assertTrue(sawClear, "Clear peripherals hook missing");
+    /**
+     * Sanity check: the framework's hook registry sees the cn1lib's
+     * properties file. Off-simulator (Android/iOS/JavaScript), this
+     * would return false and {@code AbstractTest} infrastructure has
+     * already short-circuited the run; here we run inside the JavaSE
+     * simulator so the hooks must be present.
+     */
+    private void verifyHooksAreRegisteredOnSimulator() {
+        TestUtils.assertTrue(CN.executeHook("bluetooth:toggleAdapter"),
+                "bluetooth:toggleAdapter must be registered by the cn1lib's simulator-hooks.properties");
+        // Restore state — the toggle above flipped enabled. Tests below
+        // start from a clean adapter via initEnabled() if they need it.
+        BluetoothSimulator.setEnabled(false);
     }
 
     private void verifyToggleAdapterFlipsState() {
         BluetoothSimulator.setEnabled(false);
-        BluetoothSimulatorHooks.toggleAdapter();
+        TestUtils.assertTrue(CN.executeHook("bluetooth:toggleAdapter"));
         TestUtils.assertTrue(BluetoothSimulator.isEnabled(), "first toggle should turn adapter ON");
-        BluetoothSimulatorHooks.toggleAdapter();
+        TestUtils.assertTrue(CN.executeHook("bluetooth:toggleAdapter"));
         TestUtils.assertFalse(BluetoothSimulator.isEnabled(), "second toggle should turn adapter OFF");
     }
 
     private void verifyClearPeripheralsRemovesAll() {
-        // prepare() adds the default peripheral, so the simulator starts non-empty.
+        // prepare() registers the default peripheral, so the simulator
+        // starts non-empty.
         TestUtils.assertTrue(BluetoothSimulator.registeredPeripheralCount() >= 1,
                 "prepare() should have registered the default peripheral");
-        BluetoothSimulatorHooks.clearPeripherals();
+        TestUtils.assertTrue(CN.executeHook("bluetooth:clearPeripherals"));
         TestUtils.assertEqual(0, BluetoothSimulator.registeredPeripheralCount(),
                 "clearPeripherals should leave the simulator empty");
     }
 
     private void verifyAddDemoPeripheralRegistersPeripheral() {
         BluetoothSimulator.clearPeripherals();
-        BluetoothSimulatorHooks.addDemoPeripheral();
+        TestUtils.assertTrue(CN.executeHook("bluetooth:addDemoPeripheral"));
         TestUtils.assertTrue(
-                BluetoothSimulator.isPeripheralRegistered(BluetoothSimulatorHooks.DEMO_DEVICE_ADDRESS),
+                BluetoothSimulator.isPeripheralRegistered(DEVICE_ADDRESS),
                 "addDemoPeripheral should register the demo MAC");
         TestUtils.assertEqual(1, BluetoothSimulator.registeredPeripheralCount(),
                 "exactly one peripheral after addDemoPeripheral on a cleared simulator");
@@ -105,7 +88,7 @@ public class BluetoothSimulatorHooksTest extends AbstractBluetoothSimulatorTest 
         TestUtils.assertTrue(bt.isConnected(DEVICE_ADDRESS),
                 "precondition: connectAndDiscover should leave the peripheral connected");
 
-        BluetoothSimulatorHooks.disconnectAll();
+        TestUtils.assertTrue(CN.executeHook("bluetooth:disconnectAll"));
 
         // Disconnect is dispatched asynchronously via the simulator's scheduler;
         // poll isConnected() (which IS synchronous) instead of racing a listener.
@@ -123,7 +106,7 @@ public class BluetoothSimulatorHooksTest extends AbstractBluetoothSimulatorTest 
         BluetoothSimulator.setCallbackLatencyMillis(2);
         BluetoothSimulator.setHasPermission(true);
         BluetoothSimulator.setEnabled(true);
-        BluetoothSimulatorHooks.addDemoPeripheral();
+        TestUtils.assertTrue(CN.executeHook("bluetooth:addDemoPeripheral"));
         bt.initialize(true, false, "test");
         if (!bt.isEnabled()) {
             bt.enable();
@@ -135,11 +118,11 @@ public class BluetoothSimulatorHooksTest extends AbstractBluetoothSimulatorTest 
             if ("connected".equals(m.get("status"))) {
                 connected.countDown();
             }
-        }, BluetoothSimulatorHooks.DEMO_DEVICE_ADDRESS);
+        }, DEVICE_ADDRESS);
         TestUtils.assertTrue(connected.await(2, TimeUnit.SECONDS), "connect callback should fire");
 
         final CountDownLatch discovered = new CountDownLatch(1);
-        bt.discover(evt -> discovered.countDown(), BluetoothSimulatorHooks.DEMO_DEVICE_ADDRESS);
+        bt.discover(evt -> discovered.countDown(), DEVICE_ADDRESS);
         TestUtils.assertTrue(discovered.await(2, TimeUnit.SECONDS), "discover callback should fire");
 
         final CountDownLatch notified = new CountDownLatch(1);
@@ -151,16 +134,65 @@ public class BluetoothSimulatorHooksTest extends AbstractBluetoothSimulatorTest 
             if (m.get("value") != null) {
                 notified.countDown();
             }
-        }, BluetoothSimulatorHooks.DEMO_DEVICE_ADDRESS,
-                BluetoothSimulatorHooks.DEMO_SERVICE_UUID,
-                BluetoothSimulatorHooks.DEMO_CHAR_NOTIFY_UUID);
+        }, DEVICE_ADDRESS, SERVICE_UUID, CHAR_NOTIFY_UUID);
 
         // Give the subscribe handshake a moment to land before pushing.
         Thread.sleep(50);
 
-        BluetoothSimulatorHooks.pushDemoNotification();
+        TestUtils.assertTrue(CN.executeHook("bluetooth:pushDemoNotification"));
 
         TestUtils.assertTrue(notified.await(2, TimeUnit.SECONDS),
                 "pushDemoNotification should deliver a payload to the subscriber");
+    }
+
+    /**
+     * Covers the label-less hook path. {@code bluetooth:primeReadFailure}
+     * is declared in {@code simulator-hooks.properties} without a label,
+     * so it's invisible in the menu but still callable from tests via
+     * CN.executeHook. After it fires, the next read against the demo
+     * peripheral's read characteristic surfaces a scripted error to
+     * the Bluetooth API listener.
+     */
+    private void verifyApiOnlyHookPrimesScriptedFailure() throws Exception {
+        BluetoothSimulator.reset();
+        BluetoothSimulator.setCallbackLatencyMillis(2);
+        BluetoothSimulator.setHasPermission(true);
+        BluetoothSimulator.setEnabled(true);
+        TestUtils.assertTrue(CN.executeHook("bluetooth:addDemoPeripheral"));
+
+        Bluetooth bt = new Bluetooth();
+        bt.initialize(true, false, "test");
+        if (!bt.isEnabled()) {
+            bt.enable();
+        }
+
+        final CountDownLatch connected = new CountDownLatch(1);
+        bt.connect(evt -> {
+            Map m = (Map) evt.getSource();
+            if ("connected".equals(m.get("status"))) {
+                connected.countDown();
+            }
+        }, DEVICE_ADDRESS);
+        TestUtils.assertTrue(connected.await(2, TimeUnit.SECONDS));
+
+        // Prime via the label-less API hook.
+        TestUtils.assertTrue(CN.executeHook("bluetooth:primeReadFailure"),
+                "primeReadFailure must be callable even without a menu label");
+
+        final CountDownLatch readDone = new CountDownLatch(1);
+        final AtomicReference<String> errorRef = new AtomicReference<>();
+        bt.read(evt -> {
+            Map m = (Map) evt.getSource();
+            Object err = m.get("error");
+            if (err != null) {
+                errorRef.set(err.toString());
+            }
+            readDone.countDown();
+        }, DEVICE_ADDRESS, SERVICE_UUID, CHAR_READ_UUID);
+
+        TestUtils.assertTrue(readDone.await(2, TimeUnit.SECONDS),
+                "read callback should fire even on scripted failure");
+        TestUtils.assertNotNull(errorRef.get(),
+                "primed read should produce an error payload");
     }
 }
