@@ -68,11 +68,17 @@ runs:
     - name: Build + install CN1 framework artifacts
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
+      # !download-cn1-binaries disables the default profile that runs
+      # `git clone cn1-binaries` inside the antrun phase. Without it the
+      # build tries to re-clone into the same path on every reactor
+      # module and dies with "destination path 'cn1-binaries' already
+      # exists and is not an empty directory" — we already cloned it
+      # ourselves to $RUNNER_TEMP/cn1-binaries above.
       run: |
         set -euo pipefail
         cd "$RUNNER_TEMP/CodenameOne/maven"
         mvn -B -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
-            -Plocal-dev-javase \
+            -Plocal-dev-javase,!download-cn1-binaries \
             -Dcn1.binaries="$RUNNER_TEMP/cn1-binaries" \
             install
 
