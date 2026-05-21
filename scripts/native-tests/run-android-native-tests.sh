@@ -35,7 +35,13 @@ find BTDemo/target -maxdepth 1 -type d -name '*-android-source' -exec rm -rf {} 
 # installed (only the dedicated native-ble-helper job does).
 mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android install
 
-mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
+# Use the fully-qualified plugin coordinate instead of the cn1: prefix.
+# After the install above writes to the local m2 group metadata for
+# com.codenameone, Maven can resolve the cn1 prefix from the local
+# cache without round-tripping to Central, but that local metadata
+# doesn't always list codenameone-maven-plugin's prefix mapping,
+# causing intermittent "No plugin found for prefix 'cn1'" failures.
+mvn -pl BTDemo -am com.codenameone:codenameone-maven-plugin:7.0.243:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
 
 ANDROID_SRC="$(find BTDemo/target -maxdepth 1 -type d -name '*-android-source' | sort | tail -n 1)"
 if [[ -z "$ANDROID_SRC" ]]; then

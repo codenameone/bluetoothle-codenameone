@@ -46,7 +46,10 @@ jobs:
         run: mvn -B -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=javase install
 
       - name: Run BTDemo CN1 UnitTest suite against the JavaSE simulator
-        run: xvfb-run --auto-servernum mvn -B -pl BTDemo cn1:test -Dcodename1.platform=javase
+        # Fully-qualified coordinate avoids intermittent "No plugin found
+        # for prefix 'cn1'" after the install step writes local m2 group
+        # metadata for com.codenameone (see run-android-native-tests.sh).
+        run: xvfb-run --auto-servernum mvn -B -pl BTDemo com.codenameone:codenameone-maven-plugin:7.0.243:test -Dcodename1.platform=javase
 
       - name: Upload simulator JUnit reports
         if: always()

@@ -39,7 +39,11 @@ find BTDemo/target -maxdepth 1 -type d -name '*-ios-source' -exec rm -rf {} +
 # only need the iOS toolchain.
 mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=ios install
 
-mvn -pl BTDemo -am cn1:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
+# Use the fully-qualified plugin coordinate instead of the cn1: prefix.
+# See run-android-native-tests.sh for the full rationale; in short,
+# the install step above writes local m2 group metadata that doesn't
+# always include codenameone-maven-plugin's prefix mapping.
+mvn -pl BTDemo -am com.codenameone:codenameone-maven-plugin:7.0.243:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 
 IOS_SRC="$(find BTDemo/target -maxdepth 1 -type d -name '*-ios-source' | sort | tail -n 1)"
 if [[ -z "$IOS_SRC" ]]; then
