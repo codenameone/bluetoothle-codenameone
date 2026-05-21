@@ -34,9 +34,16 @@ mkdir -p BTDemo/target
 find BTDemo/target -maxdepth 1 -type d -name '*-ios-source' -exec rm -rf {} +
 
 # Ensure all platform-specific reactor artifacts are installed locally before CN1 native-source generation.
-mvn -DskipTests -Dcodename1.platform=ios install
+# -DskipNativeBleHelper=true: iOS native tests don't exercise the JavaSE
+# Rust helper, and we don't want to require cargo on CI runners that
+# only need the iOS toolchain.
+mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=ios install
 
-mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
+# Use the fully-qualified plugin coordinate instead of the cn1: prefix.
+# See run-android-native-tests.sh for the full rationale; in short,
+# the install step above writes local m2 group metadata that doesn't
+# always include codenameone-maven-plugin's prefix mapping.
+mvn -pl BTDemo -am com.codenameone:codenameone-maven-plugin:7.0.243:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 
 IOS_SRC="$(find BTDemo/target -maxdepth 1 -type d -name '*-ios-source' | sort | tail -n 1)"
 if [[ -z "$IOS_SRC" ]]; then
@@ -139,6 +146,20 @@ PLISTEOF
 
 if [[ -f "$IOS_NATIVE_FILE" ]]; then
   perl -0pi -e 's/CN1_THREAD_STATE_MULTI_ARG instanceObject/CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject/g' "$IOS_NATIVE_FILE"
+fi
+
+# Cast `ptr` to the bridge type inside the CN1-generated dispatch shim.
+# The shim declares `ptr` as `id` and calls e.g. `[ptr requestLocation]`;
+# because the shim's own `#import`s pull in CoreLocation and
+# CoreBluetooth, clang sees both Apple's `-(void)requestLocation`
+# (CLLocationManager) / `-(void)stopScan` (CBCentralManager) and the
+# bridge's `-(BOOL)requestLocation` / `-(BOOL)stopScan` and picks the
+# void overload, failing with "initializing 'JAVA_BOOLEAN' with an
+# expression of incompatible type 'void'". Adding the cast forces
+# unambiguous selector resolution to the bridge's BOOL methods.
+CODEGEN_SHIM="$IOS_SRC/BTDemo-src/native_com_codename1_bluetoothle_BluetoothNativeBridgeImplCodenameOne.m"
+if [[ -f "$CODEGEN_SHIM" ]]; then
+  perl -0pi -e 's/\[ptr /[(com_codename1_bluetoothle_BluetoothNativeBridgeImpl*)ptr /g' "$CODEGEN_SHIM"
 fi
 
 if ! rg -q "BTDemoBluetoothNativeTests.m in Sources" "$PBXPROJ"; then
@@ -266,9 +287,25 @@ fi
 
 echo "Running iOS native tests in: $IOS_SIM_DESTINATION"
 
+# 8.0-SNAPSHOT cn1:build only generates BTDemo.xcodeproj — older versions
+# also produced a BTDemo.xcworkspace next to it. Fall back to the project
+# when the workspace is missing so the test step works across both.
+if [[ -d "$IOS_SRC/BTDemo.xcworkspace" ]]; then
+  XCBUILD_TARGET=(-workspace "$IOS_SRC/BTDemo.xcworkspace")
+else
+  XCBUILD_TARGET=(-project "$IOS_SRC/BTDemo.xcodeproj")
+fi
+
+# Force-link CoreBluetooth into the test bundle. Across CN1 generator
+# versions the test target's Frameworks build phase has a different
+# PBXFileReference UUID, so the awk-driven pbxproj surgery above isn't
+# reliable on every release. Passing OTHER_LDFLAGS as an xcodebuild
+# build setting applies to the bundle being built (BTDemoTests) and is
+# version-independent.
 xcodebuild \
-  -workspace "$IOS_SRC/BTDemo.xcworkspace" \
+  "${XCBUILD_TARGET[@]}" \
   -scheme BTDemoTests \
   -configuration Debug \
   -destination "$IOS_SIM_DESTINATION" \
+  OTHER_LDFLAGS="\$(inherited) -framework CoreBluetooth" \
   test

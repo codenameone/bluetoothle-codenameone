@@ -147,7 +147,7 @@ NSString *const operationWrite = @"write";
 @implementation BluetoothLePlugin
 
 //Peripheral Manager Functions
-- (void)initializePeripheral:(CDVInvokedUrlCommand *)command {
+- (void)cn1_initializePeripheral:(CDVInvokedUrlCommand *)command {
   initPeripheralCallback = command.callbackId;
 
   requestId = 0;
@@ -171,7 +171,7 @@ NSString *const operationWrite = @"write";
   peripheralManager = [[CBPeripheralManager alloc] initWithDelegate:self queue:nil options:options];
 }
 
-- (void)addService:(CDVInvokedUrlCommand *)command {
+- (void)cn1_addService:(CDVInvokedUrlCommand *)command {
   NSDictionary* obj = (NSDictionary *)[command.arguments objectAtIndex:0];
   CBUUID* serviceUuid = [CBUUID UUIDWithString:[obj valueForKey:@"service"]];
 
@@ -253,7 +253,7 @@ NSString *const operationWrite = @"write";
   [peripheralManager addService:service];
 }
 
-- (void)removeService:(CDVInvokedUrlCommand *)command {
+- (void)cn1_removeService:(CDVInvokedUrlCommand *)command {
   NSDictionary* obj = (NSDictionary *)[command.arguments objectAtIndex:0];
   CBUUID* serviceUuid = [CBUUID UUIDWithString:[obj valueForKey:@"service"]];
 
@@ -282,7 +282,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)removeAllServices:(CDVInvokedUrlCommand *)command {
+- (void)cn1_removeAllServices:(CDVInvokedUrlCommand *)command {
   [peripheralManager removeAllServices];
 
   servicesHash = [[NSMutableDictionary alloc] init];
@@ -295,7 +295,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)startAdvertising:(CDVInvokedUrlCommand *)command {
+- (void)cn1_startAdvertising:(CDVInvokedUrlCommand *)command {
   if (peripheralManager.isAdvertising) {
     NSMutableDictionary* returnObj = [NSMutableDictionary dictionary];
     [returnObj setValue:@"startAdvertising" forKey:@"error"];
@@ -321,7 +321,7 @@ NSString *const operationWrite = @"write";
   [peripheralManager startAdvertising:advertData];
 }
 
-- (void)stopAdvertising:(CDVInvokedUrlCommand *)command {
+- (void)cn1_stopAdvertising:(CDVInvokedUrlCommand *)command {
   if (!peripheralManager.isAdvertising) {
     NSMutableDictionary* returnObj = [NSMutableDictionary dictionary];
     [returnObj setValue:@"stopAdvertising" forKey:@"error"];
@@ -341,7 +341,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isAdvertising:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isAdvertising:(CDVInvokedUrlCommand *)command {
   NSMutableDictionary* returnObj = [NSMutableDictionary dictionary];
   [returnObj setValue:[NSNumber numberWithBool:peripheralManager.isAdvertising] forKey:@"isAdvertising"];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:returnObj];
@@ -349,7 +349,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)respond:(CDVInvokedUrlCommand *)command {
+- (void)cn1_respond:(CDVInvokedUrlCommand *)command {
   NSDictionary* obj = (NSDictionary *)[command.arguments objectAtIndex:0];
 
   NSNumber* checkRequestId = [obj valueForKey:@"requestId"];
@@ -421,7 +421,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)notify:(CDVInvokedUrlCommand *)command {
+- (void)cn1_notify:(CDVInvokedUrlCommand *)command {
   NSDictionary* obj = (NSDictionary *)[command.arguments objectAtIndex:0];
 
   CBUUID* serviceUuid = [CBUUID UUIDWithString:[obj valueForKey:@"service"]];
@@ -671,7 +671,7 @@ NSString *const operationWrite = @"write";
 }
 
 //Actions
-- (void)initialize:(CDVInvokedUrlCommand *)command {
+- (void)cn1_initialize:(CDVInvokedUrlCommand *)command {
   //Save the callback
   initCallback = command.callbackId;
 
@@ -726,21 +726,21 @@ NSString *const operationWrite = @"write";
   connections = [NSMutableDictionary dictionary];
 }
 
-- (void)enable:(CDVInvokedUrlCommand *)command {
+- (void)cn1_enable:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorEnable, keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)disable:(CDVInvokedUrlCommand *)command {
+- (void)cn1_disable:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorDisable, keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)startScan:(CDVInvokedUrlCommand *)command {
+- (void)cn1_startScan:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -780,7 +780,7 @@ NSString *const operationWrite = @"write";
   [centralManager scanForPeripheralsWithServices:serviceUuids options:@{ CBCentralManagerScanOptionAllowDuplicatesKey:allowDuplicates }];
 }
 
-- (void)stopScan:(CDVInvokedUrlCommand *)command {
+- (void)cn1_stopScan:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
       return;
@@ -808,7 +808,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)retrieveConnected:(CDVInvokedUrlCommand *)command {
+- (void)cn1_retrieveConnected:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -845,7 +845,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)retrievePeripheralsByAddress:(CDVInvokedUrlCommand *)command {
+- (void)cn1_retrievePeripheralsByAddress:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -882,21 +882,21 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)bond:(CDVInvokedUrlCommand *)command {
+- (void)cn1_bond:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorBond, keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)unbond:(CDVInvokedUrlCommand *)command {
+- (void)cn1_unbond:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorUnbond, keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)connect:(CDVInvokedUrlCommand *)command {
+- (void)cn1_connect:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -950,7 +950,7 @@ NSString *const operationWrite = @"write";
   [centralManager connectPeripheral:peripheral options:nil];
 }
 
-- (void)reconnect:(CDVInvokedUrlCommand *)command {
+- (void)cn1_reconnect:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -990,7 +990,7 @@ NSString *const operationWrite = @"write";
   [centralManager connectPeripheral:peripheral options:nil];
 }
 
-- (void)disconnect:(CDVInvokedUrlCommand *)command {
+- (void)cn1_disconnect:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1043,7 +1043,7 @@ NSString *const operationWrite = @"write";
   [centralManager cancelPeripheralConnection:peripheral];
 }
 
-- (void)close:(CDVInvokedUrlCommand *)command {
+- (void)cn1_close:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1093,7 +1093,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)discover:(CDVInvokedUrlCommand *)command {
+- (void)cn1_discover:(CDVInvokedUrlCommand *)command {
   /*NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorDiscover, keyError, logOperationUnsupported, keyMessage, nil];
    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
    [pluginResult setKeepCallbackAsBool:false];
@@ -1154,7 +1154,7 @@ NSString *const operationWrite = @"write";
   [peripheral discoverServices:serviceUuids];
 }
 
-- (void)services:(CDVInvokedUrlCommand *)command {
+- (void)cn1_services:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1196,7 +1196,7 @@ NSString *const operationWrite = @"write";
   [peripheral discoverServices:serviceUuids];
 }
 
-- (void)characteristics:(CDVInvokedUrlCommand *)command {
+- (void)cn1_characteristics:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1245,7 +1245,7 @@ NSString *const operationWrite = @"write";
   [peripheral discoverCharacteristics:characteristicUuids forService:service];
 }
 
-- (void)descriptors:(CDVInvokedUrlCommand *)command {
+- (void)cn1_descriptors:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1296,7 +1296,7 @@ NSString *const operationWrite = @"write";
   [peripheral discoverDescriptorsForCharacteristic:characteristic];
 }
 
-- (void)read:(CDVInvokedUrlCommand *)command {
+- (void)cn1_read:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1347,7 +1347,7 @@ NSString *const operationWrite = @"write";
   [peripheral readValueForCharacteristic:characteristic];
 }
 
-- (void)subscribe:(CDVInvokedUrlCommand *)command {
+- (void)cn1_subscribe:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1406,7 +1406,7 @@ NSString *const operationWrite = @"write";
   [peripheral setNotifyValue:true forCharacteristic:characteristic];
 }
 
-- (void)unsubscribe:(CDVInvokedUrlCommand *)command {
+- (void)cn1_unsubscribe:(CDVInvokedUrlCommand *)command {
     //Ensure Bluetooth is enabled
     if ([self isNotInitialized:command])
     {
@@ -1472,7 +1472,7 @@ NSString *const operationWrite = @"write";
     [peripheral setNotifyValue:false forCharacteristic:characteristic];
 }
 
-- (void)write:(CDVInvokedUrlCommand *)command {
+- (void)cn1_write:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1560,7 +1560,7 @@ NSString *const operationWrite = @"write";
   }
 }
 
-- (void)writeQ:(CDVInvokedUrlCommand *)command {
+- (void)cn1_writeQ:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1637,7 +1637,7 @@ NSString *const operationWrite = @"write";
   [self writeDataToCharacteristic:characteristic toPeripheral:peripheral];
 }
 
-- (void)readDescriptor:(CDVInvokedUrlCommand *)command {
+- (void)cn1_readDescriptor:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1694,7 +1694,7 @@ NSString *const operationWrite = @"write";
   [peripheral readValueForDescriptor:descriptor];
 }
 
-- (void)writeDescriptor:(CDVInvokedUrlCommand *)command {
+- (void)cn1_writeDescriptor:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1782,7 +1782,7 @@ NSString *const operationWrite = @"write";
   [peripheral writeValue:value forDescriptor:descriptor];
 }
 
-- (void)rssi:(CDVInvokedUrlCommand *)command {
+- (void)cn1_rssi:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1821,21 +1821,21 @@ NSString *const operationWrite = @"write";
   [peripheral readRSSI];
 }
 
-- (void)mtu:(CDVInvokedUrlCommand *)command {
+- (void)cn1_mtu:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorMtu, keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)requestConnectionPriority:(CDVInvokedUrlCommand *)command {
+- (void)cn1_requestConnectionPriority:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorRequestConnectionPriority, keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isInitialized:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isInitialized:(CDVInvokedUrlCommand *)command {
   //See if Bluetooth has been initialized
   NSNumber* result = [NSNumber numberWithBool:(centralManager != nil)];
 
@@ -1845,7 +1845,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isEnabled:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isEnabled:(CDVInvokedUrlCommand *)command {
   //See if Bluetooth is currently enabled
   NSNumber* result = [NSNumber numberWithBool:(centralManager != nil && centralManager.state == CBManagerStatePoweredOn)];
 
@@ -1855,7 +1855,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isScanning:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isScanning:(CDVInvokedUrlCommand *)command {
   //See if Bluetooth is scanning
   NSNumber* result = [NSNumber numberWithBool:(scanCallback != nil)];
 
@@ -1865,14 +1865,14 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isBonded:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isBonded:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: errorIsBonded, keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)wasConnected:(CDVInvokedUrlCommand *)command {
+- (void)cn1_wasConnected:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1921,7 +1921,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isConnected:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isConnected:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -1960,7 +1960,7 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isDiscovered:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isDiscovered:(CDVInvokedUrlCommand *)command {
   //Ensure Bluetooth is enabled
   if ([self isNotInitialized:command]) {
     return;
@@ -2008,28 +2008,28 @@ NSString *const operationWrite = @"write";
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)hasPermission:(CDVInvokedUrlCommand *)command {
+- (void)cn1_hasPermission:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: @"hasPermission", keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)requestPermission:(CDVInvokedUrlCommand *)command {
+- (void)cn1_requestPermission:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: @"requestPermission", keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isLocationEnabled:(CDVInvokedUrlCommand *)command {
+- (void)cn1_isLocationEnabled:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: @"isLocationEnabled", keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)requestLocation:(CDVInvokedUrlCommand *)command {
+- (void)cn1_requestLocation:(CDVInvokedUrlCommand *)command {
   NSDictionary* returnObj = [NSDictionary dictionaryWithObjectsAndKeys: @"requestLocation", keyError, logOperationUnsupported, keyMessage, nil];
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:returnObj];
   [pluginResult setKeepCallbackAsBool:false];

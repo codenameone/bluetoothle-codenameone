@@ -1,5 +1,9 @@
 #import <Foundation/Foundation.h>
 #import "com_codename1_bluetoothle_BluetoothNativeBridgeImpl.h"
+// Full plugin header lives here, not in the .h, so CoreBluetooth /
+// CoreLocation don't leak into the codegen shim that consumes the .h.
+// See the comment in the .h for the full rationale.
+#import "BluetoothLePlugin.h"
 #import "BluetoothLeCommandDelegateImpl.h"
 #import <objc/message.h>
 
@@ -43,7 +47,18 @@
 - (BOOL)executeCommand:(CDVInvokedUrlCommand*)command {
     BOOL retVal = YES;
     CDVPlugin* plugin = [self getBluetoothPlugin];
-    NSString* methodName = [NSString stringWithFormat:@"%@:", command.methodName];
+    // The bridge's no-arg `-(BOOL)enable`, `-(BOOL)stopScan`,
+    // `-(BOOL)requestLocation`, etc. share their first-word name with
+    // BluetoothLePlugin's Cordova-style `-(void)enable:(command)` etc.
+    // clang's -Wobjc-multiple-method-names tracks "first word", so the
+    // CN1 ParparVM-generated dispatch shim ends up with ambiguous
+    // selector resolution and clang errors with "initializing
+    // 'JAVA_BOOLEAN' with an expression of incompatible type 'void'".
+    // Renamed the underlying Cordova methods in BluetoothLePlugin.{h,m}
+    // to a unique `cn1_<action>` prefix; build the matching selector
+    // here so the action-name dispatch from the Java side still routes
+    // correctly.
+    NSString* methodName = [NSString stringWithFormat:@"cn1_%@:", command.methodName];
     SEL selector = NSSelectorFromString(methodName);
     if ([plugin respondsToSelector:selector]) {
         ((void (*)(id, SEL, id))objc_msgSend)(plugin, selector, command);

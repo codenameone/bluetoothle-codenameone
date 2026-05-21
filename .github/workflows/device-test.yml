@@ -113,9 +113,23 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME_11_X64 }}
         run: |
           export JAVA_HOME="$JAVA_HOME_11_X64"
+          # CN1's cn1:build for Android forks a Gradle 8 build which
+          # requires Java 17. The plugin reads JAVA17_HOME (uppercase,
+          # no _X64 suffix); without it the step fails with
+          # "must set the JAVA17_HOME environment variable".
+          export JAVA17_HOME="$JAVA_HOME_17_X64"
+          # Bound the heap so the inner Maven Invoker fork inside cn1:build
+          # doesn't OOM in VM init on a memory-constrained runner.
+          export MAVEN_OPTS="-Xms256m -Xmx1g"
           export PATH="$JAVA_HOME/bin:$PATH"
-          mvn -DskipTests -Dcodename1.platform=android install
-          mvn -pl BTDemo -am cn1:build -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
+          mvn -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android install
+          # Use the fully-qualified plugin coordinate instead of the cn1:
+          # prefix. After the install step writes to the local m2 group
+          # metadata for com.codenameone, Maven can resolve the cn1
+          # prefix from the local cache without round-tripping to Central
+          # — and the local metadata may not list the codenameone-maven
+          # plugin's prefix, causing "No plugin found for prefix 'cn1'".
+          mvn -pl BTDemo -am com.codenameone:codenameone-maven-plugin:7.0.243:build -DskipTests -DskipNativeBleHelper=true -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
 
       - name: Inject DeviceTestRunner into the generated project
         env:
